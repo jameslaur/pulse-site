@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse — World Economic Globe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050913; --ink:#F2F5FA; --muted:#A3B1C6; --line:rgba(163,177,198,.18);
+    --panel:rgba(12,20,38,.92); --blue:#4F7DFF; --navy:#1E3A66;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;overflow:hidden}
+  #stage{position:fixed;inset:0;cursor:grab;touch-action:none}
+  #stage.dragging{cursor:grabbing}
+  canvas{display:block;width:100%;height:100%}
+
+  header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 24px;pointer-events:none;z-index:5}
+  header > *{pointer-events:auto}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+  .brand b{font-size:22px;letter-spacing:-.02em}
+  .brand span{font-size:13px;color:var(--muted);margin-left:6px}
+  .spacer{flex:1 1 auto}
+  .search{position:relative;width:min(340px,100%)}
+  .search input{width:100%;font:inherit;font-size:15px;padding:12px 14px 12px 40px;min-height:46px;border-radius:12px;border:1px solid var(--line);background:rgba(12,20,38,.85);color:var(--ink);outline:none}
+  .search input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,125,255,.25)}
+  .search svg{position:absolute;left:13px;top:15px}
+  .results{position:absolute;top:52px;left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;list-style:none;margin:0;padding:6px;max-height:300px;overflow:auto;display:none}
+  .results.open{display:block}
+  .results button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;font:inherit;font-size:14px;color:var(--ink);background:none;border:0;padding:10px 10px;border-radius:8px;cursor:pointer;min-height:40px}
+  .results button:hover,.results button.active{background:rgba(79,125,255,.18)}
+  .tag{font-size:11px;font-weight:600;padding:2px 7px;border-radius:5px;background:rgba(163,177,198,.15);color:var(--muted)}
+  .tag.has{background:rgba(71,205,137,.18);color:#75E0A7}
+
+  .quick{position:fixed;left:24px;top:84px;display:flex;flex-direction:column;gap:8px;z-index:4}
+  .quick small{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+  .chip{display:flex;align-items:center;gap:10px;font:inherit;font-size:14px;font-weight:600;color:var(--ink);background:rgba(12,20,38,.8);border:1px solid var(--line);border-radius:999px;padding:8px 14px 8px 8px;min-height:44px;cursor:pointer}
+  .chip:hover{border-color:var(--blue)}
+  .chip i{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#06111f;font-weight:600}
+
+  .legend{position:fixed;left:24px;bottom:24px;background:rgba(12,20,38,.82);border:1px solid var(--line);border-radius:14px;padding:14px 16px;z-index:4;width:280px}
+  .legend h2{margin:0 0 10px;font-size:13px;font-weight:600}
+  .bar{height:10px;border-radius:99px;background:linear-gradient(90deg,#D92D20,#F79009,#FDE272,#47CD89,#079455)}
+  .ticks{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-top:5px}
+  .nodata{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-top:10px}
+  .nodata i{width:16px;height:16px;border-radius:4px;background:var(--navy);border:1px solid #3B5A8C}
+  .legend p{margin:10px 0 0;font-size:11.5px;line-height:1.45;color:var(--muted)}
+  .badge{font-size:10px;font-weight:700;letter-spacing:.06em;padding:2px 6px;border-radius:5px;background:rgba(247,144,9,.16);color:#FDB022;border:1px solid rgba(247,144,9,.4)}
+
+  .controls{position:fixed;right:24px;bottom:24px;display:flex;flex-direction:column;gap:8px;z-index:4}
+  .controls button{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:rgba(12,20,38,.82);color:var(--ink);cursor:pointer;display:grid;place-items:center}
+  .controls button:hover{border-color:var(--blue)}
+  .hint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);font-size:13px;color:var(--muted);background:rgba(12,20,38,.7);padding:8px 14px;border-radius:999px;z-index:3;transition:opacity .6s}
+
+  #tip{position:fixed;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;z-index:6;display:none;white-space:nowrap}
+  #tip b{display:block;font-size:14px;margin-bottom:2px}
+
+  aside{position:fixed;top:0;right:0;height:100%;width:min(420px,100%);background:var(--panel);backdrop-filter:blur(10px);border-left:1px solid var(--line);z-index:7;transform:translateX(105%);transition:transform .35s ease;overflow-y:auto;padding:22px 24px 40px}
+  aside.open{transform:none}
+  .close{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;display:grid;place-items:center}
+  aside h1{margin:4px 0 4px;font-size:30px;letter-spacing:-.02em;padding-right:48px}
+  .sub{font-size:14px;color:var(--muted);margin:0 0 18px;line-height:1.45}
+  .scorebox{display:flex;align-items:center;gap:18px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:18px}
+  .scorebox .num{font-family:'IBM Plex Mono',monospace;font-size:44px;font-weight:600;line-height:1}
+  .scorebox p{margin:4px 0 0;font-size:12.5px;color:var(--muted);line-height:1.45}
+  .toggle{display:flex;background:rgba(255,255,255,.06);border-radius:10px;padding:4px;gap:4px;margin-bottom:16px;width:max-content}
+  .toggle button{font:inherit;font-size:13px;font-weight:600;border:0;border-radius:7px;padding:7px 12px;min-height:34px;cursor:pointer;background:transparent;color:var(--muted)}
+  .toggle button[aria-pressed="true"]{background:#F2F5FA;color:#0B1220}
+  h3{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin:22px 0 10px}
+  .cats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cat{text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%}
+  .cat:hover,.cat:focus-visible{border-color:var(--blue);background:rgba(79,125,255,.10);outline:none}
+  .cat .more{font-size:11.5px;color:#9DB7FF;margin-top:6px;display:block}
+  .back{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:14px;font-weight:600;color:#9DB7FF;background:none;border:0;padding:8px 0;min-height:40px;cursor:pointer}
+  .about{font-size:15px;line-height:1.6;color:#DCE3EE;margin:0}
+  .dline{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:8px 0;border-top:1px solid var(--line)}
+  .dline b{font-family:'IBM Plex Mono',monospace;font-weight:600}
+  .news{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+  .news .meta{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .news h4{margin:0 0 8px;font-size:15.5px;line-height:1.35}
+  .news p{margin:0 0 10px;font-size:13.5px;line-height:1.55;color:#C9D3E2}
+  .news .means{background:rgba(79,125,255,.10);border-left:0;border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.55;color:#DCE3EE;margin:0 0 10px}
+  .news .means span{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;color:#9DB7FF;margin-bottom:4px}
+  .news a{font-size:13px;font-weight:600;color:#9DB7FF}
+  .nonews{font-size:14px;color:var(--muted);line-height:1.55}
+  .cat{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .cat div{display:flex;justify-content:space-between;font-size:13px;gap:6px}
+  .cat b{font-family:'IBM Plex Mono',monospace}
+  .cat .track{height:5px;background:rgba(255,255,255,.08);border-radius:9px;margin-top:8px;overflow:hidden}
+  .cat .fill{height:5px;border-radius:9px}
+  .ind{display:flex;flex-direction:column;gap:4px;padding:12px 0;border-top:1px solid var(--line)}
+  .ind .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .ind .name{font-size:14px;font-weight:600}
+  .ind .val{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600}
+  .ind .meta{font-size:12.5px;color:var(--muted)}
+  .ind .upd{font-size:11.5px;color:var(--muted)}
+  .ind .tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .ind .tag{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:#E5ECF6}
+  .ind .tag.warn{border-color:#F79009;color:#FEC84B}
+  .ind .tag.info{border-color:#3987e5;color:#9CC3F5}
+  .ind .chg{font-size:12.5px;font-weight:600}
+  .ind .expl{font-size:13px;line-height:1.5;color:#C9D3E2}
+  .note{background:rgba(247,144,9,.1);border:1px solid rgba(247,144,9,.35);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;color:#FEDF89;margin-top:12px}
+  .src{font-size:12px;color:var(--muted);line-height:1.55;margin-top:20px;border-top:1px solid var(--line);padding-top:14px}
+  .empty{font-size:15px;line-height:1.6;color:#C9D3E2}
+
+
+  /* ---------- graphics: flags, icons, charts ---------- */
+  .hero{position:relative;border-radius:16px;padding:18px 18px 16px;margin:0 0 16px;overflow:hidden;border:1px solid var(--line)}
+  .hero::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 100% 0%,rgba(255,255,255,.10),transparent 60%);pointer-events:none}
+  .hero .flag{width:64px;height:auto;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.35);display:block;margin-bottom:12px}
+  .hero h1{margin:0 0 4px}
+  .hero .sub{margin:0}
+  .hero svg.skyline{position:absolute;right:0;bottom:0;width:46%;height:auto;opacity:.13;pointer-events:none}
+  .chip .cflag{width:22px;height:auto;border-radius:3px;margin-right:-2px}
+  .cat .nm{display:flex;align-items:center;gap:7px}
+  .cat .nm svg{flex:0 0 auto;color:#9DB7FF}
+  .ahead{display:flex;align-items:center;gap:12px;margin:2px 0 4px}
+  .ahead .aico{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:rgba(79,125,255,.14);color:#9DB7FF;flex:0 0 auto}
+  .ahead h1{margin:0}
+  .chart{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:12px 12px 8px;margin-bottom:6px}
+  .chart .ct{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+  .chart .ct b{font-size:14px}
+  .chart .cs{font-size:12px;color:var(--muted);margin:0 0 6px;line-height:1.45}
+  .chart .plot{position:relative}
+  .chart svg text.ax{font-family:'IBM Plex Mono',monospace;font-size:10.5px;fill:#8A97AD}
+  .chart svg text.lab{font-size:11.5px;font-weight:600;fill:#DCE3EE}
+  .chart svg text.ann{font-size:10.5px;fill:#A3B1C6}
+  .lgd{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#C9D3E2;margin:4px 0 2px}
+  .lgd span{display:inline-flex;align-items:center;gap:6px}
+  .lgd i{width:14px;height:3px;border-radius:2px;display:inline-block}
+  .lgd i.dash{background:repeating-linear-gradient(90deg,#A3B1C6 0 4px,transparent 4px 7px)!important}
+  .cmp{font:inherit;font-size:12px;font-weight:600;color:#C9D3E2;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;padding:5px 10px;min-height:32px;cursor:pointer}
+  .ctip{position:absolute;top:0;pointer-events:none;background:#0B1220;border:1px solid rgba(163,177,198,.3);border-radius:9px;padding:7px 10px;font-size:12px;white-space:nowrap;z-index:2;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .ctip b{display:block;font-size:12px;margin-bottom:3px;color:#F2F5FA}
+  .ctip div{display:flex;align-items:center;gap:6px;color:#C9D3E2}
+  .ctip div span{margin-left:auto;padding-left:12px;font-family:'IBM Plex Mono',monospace;color:#F2F5FA;font-weight:600}
+  .ctip i{width:8px;height:8px;border-radius:50%;display:inline-block}
+  details.tbl{margin:4px 0 2px}
+  details.tbl summary{font-size:12px;color:#9DB7FF;cursor:pointer;padding:4px 0;min-height:28px}
+  details.tbl .wrap{max-height:220px;overflow:auto;margin-top:4px}
+  details.tbl table{width:100%;border-collapse:collapse;font-size:12px}
+  details.tbl th,details.tbl td{text-align:right;padding:4px 6px;border-top:1px solid var(--line);font-family:'IBM Plex Mono',monospace}
+  details.tbl th:first-child,details.tbl td:first-child{text-align:left}
+  details.tbl th{font-family:inherit;color:var(--muted);font-weight:600;position:sticky;top:0;background:#101a30}
+  .ind .row.top{align-items:center}
+  .scorebox svg{flex:0 0 auto}
+  .ind .spark{flex:0 0 auto;margin-left:auto;margin-right:10px}
+
+  /* recent-news dropdown under each indicator */
+  details.inews{margin-top:6px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.025)}
+  details.inews[open]{background:rgba(79,125,255,.06);border-color:rgba(79,125,255,.35)}
+  details.inews summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 10px;min-height:38px;font-size:13px;font-weight:600;color:#9DB7FF;border-radius:10px}
+  details.inews summary::-webkit-details-marker{display:none}
+  details.inews summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+  details.inews summary .cnt{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:#C9D3E2;background:rgba(255,255,255,.08);border-radius:99px;padding:1px 7px}
+  details.inews summary .lat{margin-left:auto;font-size:11.5px;font-weight:400;color:var(--muted)}
+  details.inews summary .chev{flex:0 0 auto;transition:transform .2s}
+  details.inews[open] summary .chev{transform:rotate(180deg)}
+  .ilist{padding:0 10px 10px;display:flex;flex-direction:column;gap:8px}
+  .inew{border-top:1px solid var(--line);padding-top:10px}
+  .inew .meta{font-size:11.5px;color:var(--muted);margin-bottom:4px}
+  .inew h4{margin:0 0 6px;font-size:14px;line-height:1.35}
+  .inew p{margin:0 0 8px;font-size:13px;line-height:1.5;color:#C9D3E2}
+  .inew .means{background:rgba(79,125,255,.10);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;color:#DCE3EE;margin:0 0 8px}
+  .inew .means span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.06em;color:#9DB7FF;margin-bottom:3px}
+  .inew a{font-size:12.5px;font-weight:600;color:#9DB7FF}
+  .crow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 8px}
+  .cchip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#F2F5FA;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 10px;min-height:32px}
+  .cchip.main{padding-right:12px}
+  .cchip i{width:12px;height:3px;border-radius:2px;display:inline-block}
+  .cx{width:26px;height:26px;border-radius:50%;border:0;background:transparent;color:#A3B1C6;font-size:16px;line-height:1;cursor:pointer}
+  .cx:hover{background:rgba(255,255,255,.1);color:#F2F5FA}
+  .cmp{border-radius:999px!important;border-style:dashed!important}
+  .cadd{position:relative;flex:1 1 180px;min-width:180px}
+  .cin{width:100%;font:inherit;font-size:13px;padding:7px 10px;min-height:34px;border-radius:9px;border:1px solid var(--blue);background:#0B1220;color:var(--ink);outline:none;box-shadow:0 0 0 3px rgba(79,125,255,.2)}
+  .clist{position:absolute;left:0;right:0;top:40px;z-index:5;list-style:none;margin:0;padding:5px;background:#0B1220;border:1px solid rgba(163,177,198,.3);border-radius:10px;box-shadow:0 10px 24px rgba(0,0,0,.45)}
+  .clist button{width:100%;display:flex;align-items:center;gap:8px;text-align:left;font:inherit;font-size:13px;color:var(--ink);background:none;border:0;padding:8px;border-radius:7px;cursor:pointer;min-height:36px}
+  .clist button .tag{margin-left:auto}
+  .clist button:hover:not(:disabled),.clist button.active{background:rgba(79,125,255,.18)}
+  .clist button:disabled{color:#7C8AA1;cursor:default}
+  .cnone{font-size:13px;color:var(--muted);padding:8px}
+  @media (max-width:720px){
+    header{padding:12px 14px}
+    .brand span{display:none}
+    .search{width:100%}
+    .quick{top:auto;bottom:150px;left:14px;flex-direction:row;flex-wrap:wrap}
+    .quick small{display:none}
+    .legend{left:14px;right:14px;bottom:14px;width:auto;padding:10px 12px}
+    .legend p{display:none}
+    .controls{right:14px;bottom:auto;top:130px}
+    .hint{display:none}
+    aside{top:auto;bottom:0;height:78%;width:100%;border-left:0;border-top:1px solid var(--line);border-radius:18px 18px 0 0;transform:translateY(105%)}
+  }
+</style>
+</head>
+<body>
+<div id="stage" aria-label="Interactive globe. Drag to spin, scroll to zoom, click a country for details." role="application"><canvas id="globe"></canvas></div>
+
+<header>
+  <a class="brand" href="#" aria-label="Pulse home">
+    <svg width="30" height="30" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#4F7DFF"/><path d="M5 15h4l2.5-6 4 11 2.5-7H23" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <b>Pulse</b><span>The world economy, country by country</span>
+  </a>
+  <div class="spacer"></div>
+  <div class="search" role="search">
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="#A3B1C6" stroke-width="2"/><path d="M20 20l-4-4" stroke="#A3B1C6" stroke-width="2" stroke-linecap="round"/></svg>
+    <label for="q" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Find a country</label>
+    <input id="q" type="search" placeholder="Find a country…" autocomplete="off" aria-controls="res" aria-expanded="false">
+    <ul class="results" id="res" role="listbox"></ul>
+  </div>
+</header>
+
+<div class="quick" id="quick"><small>Countries with data</small></div>
+
+<section class="legend" aria-label="Map key">
+  <h2>Economic score <span class="badge">SAMPLE</span></h2>
+  <div class="bar" aria-hidden="true"></div>
+  <div class="ticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+  <div class="nodata"><i aria-hidden="true"></i>No data</div>
+  <p>Germany and Malaysia are the first countries Pulse covers. Their scores are samples until the scoring method is approved. The indicator figures inside are real.</p>
+</section>
+
+<div class="controls">
+  <button type="button" id="zin" aria-label="Zoom in"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+  <button type="button" id="zout" aria-label="Zoom out"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+  <button type="button" id="spin" aria-label="Pause spinning" aria-pressed="true"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</div>
+<div class="hint" id="hint">Drag to spin · scroll to zoom · click a coloured country</div>
+<div id="tip" role="tooltip"></div>
+
+<aside id="panel" aria-live="polite" aria-label="Country details">
+  <button type="button" class="close" id="close" aria-label="Close details"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
+  <div id="pbody"></div>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+/* ---------- Pulse data (real indicator values from the Pulse test database, 16 Nov 2026; scores are SAMPLES) ---------- */
+const DATA = {
+  '458': {
+    name:'Malaysia', score:68,
+    sub:'Upper-middle-income, export-driven economy · ringgit (RM)',
+    cats:[['Economic Growth',74],['Financial Stability',71],['International Trade',70],['Investment Environment',63],['Government & Fiscal',55],['Industry & Competitiveness',66]],
+    inds:[
+      {n:'GDP growth',v:'5.5%',p:'Q3 2026',c:'from 5.3% a year ago',t:'good',e:'The economy produced 5.5% more than a year earlier, which is strong growth.',a:'Real GDP, % y/y, constant 2015 prices · DOSM gdp_qtr_real (final Q3 figures, released 18 Nov 2026)'},
+      {n:'Inflation',v:'1.8%',p:'Sep 2026',c:'from 1.5% a year ago',t:'bad',e:'Prices are about 1.8% higher than last year. That is still low for households.',a:'CPI % y/y, calculated from index 2010=100 · DOSM cpi_2d'},
+      {n:'Unemployment',v:'2.9%',p:'Sep 2026',c:'from 3.0% a year ago',t:'good',e:'About 3 in 100 people who want a job don’t have one, which is low.',a:'DOSM headline unemployment rate (not seasonally adjusted) · DOSM lfs_month. The chart uses the seasonally adjusted series (lfs_month_sa), which smooths out regular seasonal swings'},
+      {n:'Policy interest rate',v:'2.75%',p:'Nov 2026',c:'held on 3 Sep 2026',t:'flat',e:'The central bank’s main rate. Lower rates make borrowing cheaper.',a:'Overnight Policy Rate, level in force · BNM MPC decisions'},
+      {n:'Ringgit per US dollar',v:'RM 4.08',p:'Oct 2026',c:'ringgit 3% stronger than a year ago',t:'flat',e:'One US dollar costs RM 4.08. Fewer ringgit per dollar means a stronger ringgit.',a:'MYR per USD, monthly average · BNM via data.gov.my'},
+      {n:'Goods trade balance',v:'RM 33.7bn',p:'Sep 2026',c:'from RM 20.5bn a year ago',t:'good',e:'Malaysia sold RM 33.7bn more goods abroad than it bought this month.',a:'Exports − imports (calculated) · DOSM trade_headline'},
+      {n:'Budget balance',v:'−3.7% of GDP',p:'2025',c:'narrower than −4.1% in 2024',t:'good',e:'The federal government spent more than it collected, but the gap is shrinking.',a:'Federal overall balance ÷ nominal GDP (calculated) · federal govt, cash basis'}
+    ],
+    notes:['Public debt is held back until the Accountant General’s Department confirms it can be shown commercially.','Latest open foreign-investment figure is Q3 2025 (net inflow RM 8.5bn), shown as context only.'],
+    src:'Department of Statistics Malaysia (OpenDOSM, CC BY 4.0) · Bank Negara Malaysia (subject to Terms of Use for BNM Datasets) · data.gov.my (CC BY 4.0). Calculations by Pulse.'
+  },
+  '276': {
+    name:'Germany', score:64,
+    sub:'High-income industrial economy · euro area member · euro (€)',
+    cats:[['Economic Growth',52],['Financial Stability',66],['International Trade',72],['Investment Environment',58],['Government & Fiscal',69],['Industry & Competitiveness',67]],
+    inds:[
+      {n:'GDP growth',v:'1.2%',p:'Q3 2026',c:'from 0.3% a year ago',t:'good',e:'Growing again after a long flat stretch, though still modest.',a:'Real GDP, % y/y, chain-linked · Eurostat namq_10_gdp'},
+      {n:'Inflation',v:'2.9%',p:'Oct 2026',c:'from 2.3% a year ago',t:'bad',e:'Prices are 2.9% higher than last year, a little above the ECB’s 2% goal.',a:'HICP (EU-harmonised) % y/y · Eurostat prc_hicp_minr, final October figure released 18 Nov 2026'},
+      {n:'Unemployment',v:'4.1%',p:'Sep 2026',c:'from 3.8% a year ago',t:'bad',e:'About 4 in 100 people who want a job don’t have one, slowly rising.',a:'Unemployment rate, SA · Eurostat une_rt_m'},
+      {n:'Policy interest rate',v:'2.50%',p:'Nov 2026',c:'raised on 16 Sep 2026',t:'flat',e:'Set by the European Central Bank for the whole euro area.',a:'ECB deposit facility rate, level in force · ECB decisions'},
+      {n:'US dollars per euro',v:'$1.12',p:'Oct 2026',c:'euro 3% weaker than a year ago',t:'flat',e:'One euro buys $1.12.',a:'USD per EUR, monthly average · ECB EXR'},
+      {n:'Goods trade balance',v:'€15.6bn',p:'Sep 2026',c:'from €15.5bn a year ago',t:'flat',e:'Germany sold €15.6bn more goods abroad than it bought this month.',a:'Foreign trade balance, calendar and seasonally adjusted · Destatis via Deutsche Bundesbank (dl-de/by-2-0), released 9 Nov 2026'},
+      {n:'Public debt',v:'62.8% of GDP',p:'2025',c:'from 61.4% in 2024',t:'bad',e:'What all levels of government owe, compared with one year of output.',a:'General government gross debt · Eurostat gov_10dd_edpt1, October 2026 notification (released 21 Oct 2026)'}
+    ],
+    notes:['Germany’s government figures cover federal, state and local government plus social security. Malaysia’s cover the federal government only, so compare trends, not levels.'],
+    src:'Eurostat (calculations by Pulse) · ECB statistics · Deutsche Bundesbank · Statistisches Bundesamt (Destatis), dl-de/by-2-0.'
+  }
+};
+/* ---------- the six areas: what they mean, what the data says, recent news (summaries in Pulse's own words) ---------- */
+const AREA_ABOUT = {
+  'Economic Growth': 'How fast the economy is producing more goods and services. When growth is strong, businesses usually hire and incomes rise. When it slows or turns negative, jobs and profits come under pressure.',
+  'Financial Stability': 'Whether prices, jobs, interest rates and the currency are steady. Stable prices protect what wages buy, and steady interest rates and currencies make it easier for families and businesses to plan.',
+  'International Trade': 'How much the country sells to and buys from the rest of the world. Strong exports bring in money and jobs, but a very trade-dependent economy feels global slowdowns and tariffs faster.',
+  'Investment Environment': 'How much money is being put into factories, buildings, equipment and technology, including from foreign companies. Investment today is what drives jobs and growth tomorrow.',
+  'Government & Fiscal': 'The health of the government’s finances: how much it collects, spends, borrows and pays in interest. High interest costs leave less room for schools, roads or help in a crisis, and can worry investors.',
+  'Industry & Competitiveness': 'How productive and cost-competitive the country’s industries are: output per hour worked, labour costs and manufacturing strength. This decides whether local firms can win against foreign rivals.'
+};
+const AREAS = {
+  '458': {
+    'Economic Growth': {
+      data: [['GDP growth, Q3 2026', '5.5%'], ['GDP growth, a year earlier', '5.3%'], ['Industrial production vs a year ago', '+6.3%']],
+      news: [
+        {h:'Final figures: growth was 5.5% in Q3, better than the early 5.3% estimate', src:'Department of Statistics Malaysia (OpenDOSM)', date:'18 Nov 2026', url:'https://open.dosm.gov.my/data-catalogue/gdp_qtr_real',
+         sum:'The final third-quarter figures show the economy grew 5.5% in July–September compared with a year earlier, revised up from the 5.3% early estimate and down a little from 6.0% in the second quarter. Compared with the previous quarter, growth was 4.8%.',
+         means:'Growth is still strong by any standard. The dip from 6% looks like a cooling after an unusually strong quarter, not a slump.'},
+        {h:'HSBC raises its 2026 growth forecast for Malaysia to 5.5%', src:'Bernama', date:'30 Oct 2026', url:'https://www.bernama.com/en/news.php/?id=2627698',
+         sum:'HSBC lifted its forecast for Malaysia’s growth this year to 5.5%.',
+         means:'Forecasters are becoming more upbeat about Malaysia. This is a bank’s forecast, not official data.'}
+      ]},
+    'Financial Stability': {
+      data: [['Inflation, Sep 2026', '1.8%'], ['Unemployment, Sep 2026', '2.9%'], ['Policy rate (OPR)', '2.75%'], ['Ringgit per US dollar, Oct 2026', 'RM 4.08']],
+      news: [
+        {h:'Bank Negara keeps its key interest rate at 2.75% for the eighth meeting in a row', src:'New Straits Times', date:'5 Nov 2026', url:'https://www.nst.com.my/amp/business/corporate/2026/11/1571412/bank-negara-leaves-opr-unchanged-final-2026-mpc-meeting-watch',
+         sum:'At its last meeting of 2026 the central bank left the Overnight Policy Rate unchanged. It said growth momentum held up in the third quarter, with exports and tourism expected to keep driving the economy, and the current rate is still appropriate. It also warned that geopolitical uncertainty and persistent inflation could weigh on global growth.',
+         means:'Loan repayments on floating-rate home and car loans stay the same for now. Several analysts expect a rise to 3.00% in early 2027. By one estimate, a 0.25-point rise would add about RM58 a month to a RM400,000 home loan.'},
+        {h:'Ringgit strengthens after the decision', src:'Bernama', date:'5 Nov 2026', url:'https://bernama.com/en/market/news.php?id=2630567',
+         sum:'The ringgit closed firmer against the US dollar after the rate decision, at about RM4.04 per dollar.',
+         means:'A stronger ringgit makes imported goods a little cheaper for Malaysians, which helps keep inflation low.'}
+      ]},
+    'International Trade': {
+      data: [['Goods exports, Sep 2026', 'RM 215.1bn'], ['Goods trade balance, Sep 2026', 'RM 33.7bn'], ['Trade ÷ GDP, Q3 2026', '164%']],
+      news: [
+        {h:'Exports jump 54.5% to a record RM215.1 billion in September', src:'Department of Statistics Malaysia', date:'19 Oct 2026', url:'https://www.dosm.gov.my/portal-main/release-content/monthly-external-trade-statistics-sep2026',
+         sum:'Exports rose 54.5% and imports 52.7% compared with September 2025. Over January to September, exports were up 34% and the trade surplus more than doubled to RM232.4 billion. The monthly surplus of RM33.7 billion was the 77th in a row.',
+         means:'Global spending on AI, data centres and computing is driving demand for Malaysian electronics. That is a big boost now, but it ties Malaysia closely to the tech cycle: if that demand cools, exports could fall quickly.'},
+        {h:'Record nine months, but growth may cool', src:'New Straits Times', date:'21 Oct 2026', url:'https://www.nst.com.my/amp/business/economy/2026/10/1560192/malaysia-posts-rm157tril-exports-nine-months-growth-may-cool',
+         sum:'Exports reached a record RM1.57 trillion in the first nine months. An economist cautioned that the headline growth figures don’t show everything about the underlying strength of trade.',
+         means:'Expect growth rates to look smaller next year simply because 2026 sets such a high base.'}
+      ]},
+    'Investment Environment': {
+      data: [['Investment share of GDP, Q3 2026', '20.4%'], ['Net foreign direct investment, Q2 2026', 'RM 7.4bn']],
+      news: [
+        {h:'RM218.5 billion of investment approved in the first half of 2026', src:'MIDA (official announcement)', date:'28 Aug 2026', url:'https://www.mida.gov.my/media-release/malaysia-secures-rm218-5-billion-in-approved-investments-in-1h-2026-with-domestic-investment-in-manufacturing-up-23/',
+         sum:'Approved investments rose 11.7% from a year earlier across 2,746 projects, expected to create about 99,000 jobs. Foreign investors accounted for RM126.9 billion. Data-centre and cloud projects alone made up roughly RM95.8 billion, close to half the total.',
+         means:'Approvals are plans, not money already spent, and they are not the same as foreign direct investment. Projects usually take 18–24 months to get going. Still, a pipeline this large points to more building, hiring and capacity ahead.'},
+        {h:'World Bank: investment and jobs keep the outlook positive', src:'Malay Mail', date:'11 Nov 2026', url:'https://www.malaymail.com/news/money/2026/11/11/malaysias-economy-resilient-despite-global-risks-world-bank-calls-for-decisive-reforms/242869',
+         sum:'The World Bank expects Malaysia’s economy to stay positive in the second half of 2026, supported by job gains and ongoing investment. Its report says smaller firms need more financing for expansion, automation and technology.',
+         means:'Large investors are arriving, but helping smaller Malaysian firms grow and modernise is the next challenge.'}
+      ]},
+    'Government & Fiscal': {
+      data: [['Budget balance, 2025', '−3.7% of GDP'], ['Interest ÷ revenue, 2025', '16.0%'], ['Public debt', 'awaiting data rights']],
+      news: [
+        {h:'Government projects the deficit narrowing to 3.5% of GDP in 2026', src:'Ministry of Finance Malaysia', date:'2026 Budget', url:'https://www.mof.gov.my/portal/en/news/press-citations/malaysia-to-sustain-growth-at-4-4-5-pct-next-year-driven-by-higher-demand-for-semiconductors-ai-applications---mof',
+         sum:'The finance ministry’s budget outlook projects the overall fiscal deficit falling to 3.5% of GDP in 2026.',
+         means:'The government is gradually closing the gap between what it spends and what it collects. This is a projection; Pulse will show the actual figure when it is published.'},
+        {h:'World Bank urges Malaysia to keep rebuilding its fiscal buffers', src:'Malay Mail', date:'11 Nov 2026', url:'https://www.malaymail.com/news/money/2026/11/11/malaysias-economy-resilient-despite-global-risks-world-bank-calls-for-decisive-reforms/242869',
+         sum:'The World Bank recommended that Malaysia continue rebuilding fiscal space to cushion future shocks, and keep up structural reforms.',
+         means:'Interest already takes about 16 sen of every ringgit of federal revenue. More room in the budget would help in a downturn.'}
+      ]},
+    'Industry & Competitiveness': {
+      data: [['Output per hour, Q2 2026', 'RM 46.50'], ['Industry output per hour', 'RM 62.20'], ['Industrial production vs a year ago', '+6.3%']],
+      news: [
+        {h:'Manufacturing projects up 88% in the first half, though their total value fell', src:'MIDA (official announcement)', date:'28 Aug 2026', url:'https://www.mida.gov.my/beyond-the-numbers-how-investments-are-building-malaysias-future-capabilities/',
+         sum:'Manufacturing drew RM51.3 billion of approved investment across 973 projects. The value was lower than an exceptionally large first half of 2025, but the number of projects rose 88%.',
+         means:'Investment is spreading across many more factories rather than a few giant projects, which can broaden the industrial base.'}
+      ]}
+  },
+  '276': {
+    'Economic Growth': {
+      data: [['GDP growth, Q3 2026', '1.2%'], ['GDP growth, a year earlier', '0.3%'], ['Industrial production vs a year ago', '+0.9%']],
+      news: [
+        {h:'Economy grew 0.2% in the third quarter', src:'Commerzbank Research', date:'30 Oct 2026', url:'https://www.commerzbank.de/group/newsroom/publications/261030-ei-german-gdp-e.html',
+         sum:'GDP rose 0.2% on the previous quarter, slightly better than expected. Consumer spending and exports grew, while investment fell. Detailed figures follow on 25 November.',
+         means:'Germany is growing again, slowly. Analysts expect moderate growth to continue, but high energy prices, US tariffs and Chinese competition are holding it back.'},
+        {h:'Recovery holding up despite the energy shock', src:'Commerzbank Research', date:'11 Nov 2026', url:'https://www.commerzbank.de/group/newsroom/publications/261111-eb-recovery-monitor-e.html',
+         sum:'Commerzbank says the economy has grown fairly strongly in recent quarters despite the Iran war and the sharp rise in energy prices, and expects growth to continue in the fourth quarter. Housebuilding and retail remain weak.',
+         means:'The upturn looks real, but it is uneven: factories are recovering faster than shops and construction.'}
+      ]},
+    'Financial Stability': {
+      data: [['Inflation, Oct 2026', '2.9%'], ['Unemployment (EU measure), Sep 2026', '4.1%'], ['ECB deposit rate', '2.50%'], ['US dollars per euro, Oct 2026', '$1.12']],
+      news: [
+        {h:'ECB raises rates again as the Iran-war energy shock lifts inflation', src:'Euronews', date:'10 Sep 2026', url:'https://www.euronews.com/2026/09/10/ecb-hikes-rates-to-25-as-energy-shock-pushes-eurozone-inflation-higher',
+         sum:'The European Central Bank raised its deposit rate from 2.25% to 2.50%, its second increase since June. Euro-area inflation hit 3.3% in August, the highest since 2023, almost entirely because energy prices jumped.',
+         means:'Borrowing is getting more expensive for German households and firms. Some economists expect one more rise, to 2.75%, before year-end if energy stays high.'},
+        {h:'Unemployment stuck at its highest level since 2020', src:'Federal Employment Agency', date:'30 Oct 2026', url:'https://www.arbeitsagentur.de/presse/2026-41-arbeitsmarkt-im-oktober-2026',
+         sum:'Germany’s national jobless rate stayed at 6.4% in October. The agency said economic conditions are still not strong enough to improve the job market.',
+         means:'Jobs usually recover after growth does, so hiring is lagging the recovery. Germany’s national count is higher than the 4.1% Pulse shows because Pulse uses the EU-wide definition, which allows comparison with other countries.'}
+      ]},
+    'International Trade': {
+      data: [['Goods exports, Sep 2026', '€141.1bn'], ['Goods trade balance, Sep 2026', '€15.6bn'], ['Trade ÷ GDP, Q2 2026', '81%']],
+      news: [
+        {h:'Exports rebound in September, but the trade surplus narrows', src:'Morningstar / Dow Jones', date:'9 Nov 2026', url:'https://www.morningstar.com/news/dow-jones/202611091596/german-trade-surplus-narrows-despite-rising-exports-update',
+         sum:'German exports picked up in September after a volatile summer, but imports grew faster, shrinking the trade surplus.',
+         means:'Exporters got some relief, but US tariffs and strong Chinese competition mean exports are unlikely to bounce back as strongly as in past recoveries.'}
+      ]},
+    'Investment Environment': {
+      data: [['Investment share of GDP, Q2 2026', '20.1%'], ['Credit growth, Sep 2026', '4.0%']],
+      news: [
+        {h:'Business investment fell in the third quarter', src:'Commerzbank Research', date:'30 Oct 2026', url:'https://www.commerzbank.de/group/newsroom/publications/261030-ei-german-gdp-e.html',
+         sum:'Investment dropped in the third quarter even as the wider economy grew. Commerzbank argues that without bigger reforms, company investment is unlikely to recover much.',
+         means:'Firms are still cautious about spending on new plants and equipment in Germany.'},
+        {h:'2027 draft budget lifts public investment to €117.5 billion', src:'Reuters via Investing.com', date:'6 Jul 2026', url:'https://www.investing.com/news/economic-indicators/german-cabinet-approves-2027-draft-budget-hikes-defence-investment-spending-4777033',
+         sum:'The government’s draft budget raises total investment to €117.5 billion in 2027, up from €78.9 billion in 2025, helped by a €500 billion infrastructure fund and looser borrowing rules for defence.',
+         means:'Government spending on roads, rail, energy and defence could make up for weaker private investment, but it is funded by borrowing.'}
+      ]},
+    'Government & Fiscal': {
+      data: [['Budget balance, 2025', '−2.9% of GDP'], ['Public debt, 2025', '62.8% of GDP'], ['Interest ÷ revenue, 2025', '2.3%']],
+      news: [
+        {h:'Bundesbank expects the deficit to rise to about 4% of GDP this year', src:'Deutsche Bundesbank', date:'May 2026', url:'https://publikationen.bundesbank.de/content/996634',
+         sum:'The central bank says government finances are expansionary: the deficit is set to rise to around 4% of GDP in 2026 and move closer to 5% next year, mainly because of debt-financed defence spending.',
+         means:'Germany is deliberately borrowing more to rebuild defence and infrastructure. Its interest costs are still low, but debt is expected to climb.'},
+        {h:'Draft 2027 budget includes over €200 billion of new borrowing', src:'Reuters via Investing.com', date:'6 Jul 2026', url:'https://www.investing.com/news/economic-indicators/german-cabinet-approves-2027-draft-budget-hikes-defence-investment-spending-4777033',
+         sum:'Planned new borrowing for 2027 adds up to €118.7 billion in the core budget, €54.9 billion through the infrastructure fund and €30 billion from a special defence fund.',
+         means:'A big change for a country known for strict debt limits: watch whether this spending lifts growth enough to justify the extra debt.'}
+      ]},
+    'Industry & Competitiveness': {
+      data: [['Manufacturing output per hour, Q2 2026', '€68.28'], ['Unit labour cost (2020=100), 2025', '122.6'], ['Industrial production vs a year ago', '+0.9%']],
+      news: [
+        {h:'Factory mood at its best since the Ukraine war began', src:'Commerzbank Research', date:'11 Nov 2026', url:'https://www.commerzbank.de/group/newsroom/publications/261111-eb-recovery-monitor-e.html',
+         sum:'The Ifo business climate for industry improved again in October, with slightly more firms positive than negative for the first time since early 2022. Production rose 0.7% in September and new orders jumped 4.4%.',
+         means:'German manufacturing may finally be turning the corner after years of decline, though high energy costs remain a risk.'}
+      ]}
+  }
+};
+
+
+/* ---------- recent news for each key indicator (summaries in Pulse's own words, checked 19 Nov 2026) ---------- */
+const IND_NEWS = {
+  '458': {
+    'GDP growth': [
+      {h:'Final figures: third-quarter growth revised up to 5.5%', src:'Department of Statistics Malaysia (OpenDOSM)', date:'18 Nov 2026', url:'https://open.dosm.gov.my/data-catalogue/gdp_qtr_real',
+       sum:'DOSM’s final figures put July–September growth at 5.5%, up from the 5.3% early estimate published on 16 October, and slightly below 6.0% in April–June.',
+       means:'Still strong growth, and a little better than first thought. This is the figure Pulse now shows.'},
+      {h:'Early estimate: growth cooled to 5.3% in the third quarter', src:'Department of Statistics Malaysia', date:'16 Oct 2026', url:'https://www.dosm.gov.my/portal-main/release-content/advance-gross-domestic-product-gdp-estimates-q32026',
+       sum:'Growth slowed from 6.0% in April–June to 5.3% in July–September. Services, manufacturing and construction all grew, while mining shrank. Over the first nine months the economy grew 5.5%, up from 4.8% a year earlier.',
+       means:'This early estimate has since been replaced by the final figure above.'},
+      {h:'Economists say Malaysia could beat its own 2026 forecast', src:'The Star', date:'16 Oct 2026', url:'https://www.thestar.com.my/business/business-news/2026/10/16/malaysia-on-track-to-exceed-2026-gdp-growth-forecast',
+       sum:'With 5.5% growth so far this year, economists say full-year growth could end up above the government’s official range of 4.8–5.3%.',
+       means:'Good news for jobs and incomes if it holds. These are forecasts, not official data.'},
+      {h:'But momentum may be slowing under the headline', src:'The Star', date:'20 Oct 2026', url:'https://www.thestar.com.my/business/business-news/2026/10/20/growth-momentum-expected-to-moderate-despite-3q-optimism',
+       sum:'CIMB Research estimates that, compared with the previous quarter, growth slowed to 1.3% from 2.5%, a sign that spending at home is easing.',
+       means:'Comparing with a year ago can hide a recent slowdown. Watch whether the next quarter confirms it.'}
+    ],
+    'Inflation': [
+      {h:'Inflation eased to 1.8% in September', src:'Bernama', date:'19 Oct 2026', url:'https://www.bernama.com/tv/news.php?id=2622347',
+       sum:'Prices were 1.8% higher than a year earlier, down from 1.9% in August. Housing, water, electricity and fuel costs rose more slowly. Prices rose only 0.1% from August.',
+       means:'Prices are rising slowly, so wages keep most of their buying power. October’s figure is due shortly.'},
+      {h:'World Bank warns rising business costs could push prices up later', src:'The Sun', date:'Oct 2026', url:'https://thesun.my/?p=684910',
+       sum:'Malaysia’s inflation is among the lowest in the region (1.9% in August, against 2.5% in Thailand and 3.2% in Indonesia), but the World Bank says higher costs for producers could feed through to shop prices.',
+       means:'If fuel and factory costs stay high, inflation could pick up from here.'},
+      {h:'Subsidies are shielding shoppers from global price spikes', src:'Business Today', date:'21 Sep 2026', url:'https://www.businesstoday.com.my/2026/09/21/kenanga-lowers-2026-inflation-forecast-to-1-9-on-effective-subsidy-shield/',
+       sum:'Kenanga cut its 2026 inflation forecast to 1.9%, saying targeted government subsidies are protecting consumers from the full rise in global commodity prices.',
+       means:'Low inflation is partly paid for by the government. That cost shows up in the budget balance below.'}
+    ],
+    'Unemployment': [
+      {h:'Jobless rate holds at 2.9% as more people find work', src:'The Edge Malaysia', date:'11 Nov 2026', url:'https://theedgemalaysia.com/node/825315',
+       sum:'The number of unemployed edged up to 513,200 in September, but the number of people in work rose faster, to 16.89 million. Economists generally treat about 3% as full employment.',
+       means:'Almost everyone who wants a job has one. This is DOSM’s headline figure, and it is the one Pulse shows.'},
+      {h:'Job losses up 29% this year in some industries', src:'The Vibes', date:'19 Sep 2026', url:'https://www.thevibes.com/articles/news/127461/job-losses-rise-29-to-68177-as-malaysia-labour-market-faces-sectoral-pressure',
+       sum:'68,177 workers lost their jobs between January and mid-September, 15,196 more than a year earlier. Manufacturing, wholesale and retail were hit hardest.',
+       means:'The overall rate is steady, but some sectors are cutting staff. Worth watching if export growth cools.'}
+    ],
+    'Policy interest rate': [
+      {h:'Bank Negara holds at 2.75% at its last meeting of the year', src:'New Straits Times', date:'5 Nov 2026', url:'https://www.nst.com.my/amp/business/corporate/2026/11/1571412/bank-negara-leaves-opr-unchanged-final-2026-mpc-meeting-watch',
+       sum:'The central bank left its main rate unchanged, saying growth held up in the third quarter and the current level is still right. It flagged geopolitics and stubborn global inflation as risks.',
+       means:'Monthly repayments on floating-rate loans stay the same for now.'},
+      {h:'Economists expect a rate rise in early 2027', src:'Reuters via Devdiscourse', date:'Nov 2026', url:'https://www.devdiscourse.com/article/international/4007273-poll-malaysia-gdp-growth-likely-slowed-to-53-in-july-to-september',
+       sum:'Economists polled by Reuters expect Bank Negara to raise its rate in the first quarter of 2027, with growth holding up and price pressures building. The rate has been 2.75% since July 2025.',
+       means:'Borrowing could get a little more expensive next year. This is a forecast, not a decision.'}
+    ],
+    'Ringgit per US dollar': [
+      {h:'Ringgit nearly 3% stronger against the dollar than a year ago', src:'The Vibes', date:'4 Nov 2026', url:'https://www.thevibes.com/articles/business/129155/ringgit-strengthens-as-easing-us-iran-tensions-weigh-on-us-dollar',
+       sum:'One US dollar cost about RM4.07. The ringgit has gained 2.84% over 12 months, helped by hopes of easing US–Iran tensions, which cut demand for the dollar as a safe place to park money.',
+       means:'A stronger ringgit makes imports and travel abroad cheaper for Malaysians, and makes exports slightly pricier for foreign buyers.'},
+      {h:'Dollar firms on bets of another US rate rise', src:'Bernama', date:'16 Nov 2026', url:'https://www.bernama.com/en/news.php?id=2634849',
+       sum:'The ringgit opened almost flat as markets expected the US Federal Reserve to raise rates again, keeping the dollar strong. US 10-year bond yields stayed above 5%.',
+       means:'What the US central bank does matters for the ringgit. A December Fed hike could weaken it a little.'}
+    ],
+    'Goods trade balance': [
+      {h:'Exports jump 54.5% to a record RM215.1 billion in September', src:'Department of Statistics Malaysia', date:'19 Oct 2026', url:'https://www.dosm.gov.my/portal-main/release-content/monthly-external-trade-statistics-sep2026',
+       sum:'Exports rose 54.5% and imports 52.7% on a year earlier. The RM33.7 billion surplus was the 77th monthly surplus in a row. Over January–September the surplus more than doubled to RM232.4 billion.',
+       means:'Global spending on AI and data centres is driving demand for Malaysian electronics. That ties Malaysia closely to the tech cycle.'},
+      {h:'Record nine months, but growth may cool', src:'New Straits Times', date:'21 Oct 2026', url:'https://www.nst.com.my/amp/business/economy/2026/10/1560192/malaysia-posts-rm157tril-exports-nine-months-growth-may-cool',
+       sum:'Exports hit a record RM1.57 trillion in nine months. An economist cautioned that the headline growth rates don’t show everything about the underlying strength of trade.',
+       means:'Growth rates will look smaller next year simply because 2026 sets such a high starting point.'}
+    ],
+    'Budget balance': [
+      {h:'Budget 2027 aims to cut the deficit to 3.3% of GDP', src:'Fitch Ratings via Business Today', date:'13 Oct 2026', url:'https://www.businesstoday.com.my/2026/10/13/malaysias-budget-maintains-gradual-fiscal-consolidation/',
+       sum:'The government targets a 3.3% deficit in 2027. This year’s target was raised to 3.6% from 3.5% because higher subsidy costs pushed spending up nearly 6%. A general election is due by February 2028.',
+       means:'The gap is still shrinking, just more slowly. Subsidies are the main pressure.'},
+      {h:'A RM40 billion fuel subsidy bill strains the plan', src:'Asia News Network', date:'Oct 2026', url:'https://asianews.network/?p=307069',
+       sum:'Economists say fuel subsidies of about RM40 billion make the 3.3% goal harder. One said it is reachable if growth holds and oil doesn’t stay above US$100 a barrel for more than about six months.',
+       means:'Oil prices are the big swing factor for Malaysia’s budget.'}
+    ]
+  },
+  '276': {
+    'GDP growth': [
+      {h:'Economy grew 0.2% in the third quarter', src:'Commerzbank Research', date:'30 Oct 2026', url:'https://www.commerzbank.de/group/newsroom/publications/261030-ei-german-gdp-e.html',
+       sum:'GDP rose 0.2% on the previous quarter, slightly better than expected. Consumer spending and exports grew, while investment fell. Detailed figures follow on 25 November.',
+       means:'Germany is growing again, slowly. High energy prices, US tariffs and Chinese competition are holding it back.'},
+      {h:'Recovery holding up despite the energy shock', src:'Commerzbank Research', date:'11 Nov 2026', url:'https://www.commerzbank.de/group/newsroom/publications/261111-eb-recovery-monitor-e.html',
+       sum:'Commerzbank expects growth to continue in the fourth quarter despite the jump in energy prices. Housebuilding and retail remain weak.',
+       means:'The upturn looks real but uneven: factories are recovering faster than shops and construction.'}
+    ],
+    'Inflation': [
+      {h:'Inflation fell to 2.8% in October as a fuel discount kicked in', src:'Destatis', date:'11 Nov 2026', url:'https://www.destatis.de/EN/Press/2026/11/PE26_392_611.html',
+       sum:'Prices were 2.8% higher than a year earlier, down from 3.3% in September, the highest since December 2023. Energy was still 12.2% dearer than a year ago, while food rose just 0.4%. A new fuel discount from 1 October likely helped.',
+       means:'Relief at the pump, but energy is still the main driver, and the discount is temporary. This 2.8% is Germany’s national price index; Pulse shows the EU-harmonised measure (2.9% in October), which lets you compare countries.'},
+      {h:'Underlying inflation eased to 2.1%', src:'Destatis', date:'30 Oct 2026', url:'https://www.destatis.de/EN/Press/2026/10/PE26_382_611.html',
+       sum:'Leaving out food and energy, prices rose 2.1% on a year earlier. Overall prices fell 0.2% from September.',
+       means:'Underneath the energy shock, inflation is close to the ECB’s 2% goal.'}
+    ],
+    'Unemployment': [
+      {h:'National jobless rate stuck at 6.4%, highest since 2020', src:'Federal Employment Agency', date:'30 Oct 2026', url:'https://www.arbeitsagentur.de/presse/2026-41-arbeitsmarkt-im-oktober-2026',
+       sum:'Germany’s national unemployment rate stayed at 6.4% in October. The agency said the economy is not yet strong enough to improve the job market.',
+       means:'Hiring usually recovers after growth does. Germany’s national count is higher than Pulse’s 4.1% because Pulse uses the EU definition, which lets you compare countries.'},
+      {h:'EU measure: 4.1% in September, with fewer people in work', src:'Destatis', date:'Oct 2026', url:'https://www.destatis.de/EN/Press/2026/10/PE26_380_132.html',
+       sum:'About 1.79 million people were unemployed under the EU-wide survey measure. Employment was 0.5% lower than a year earlier. Detailed third-quarter results are due on 18 November.',
+       means:'This is the figure Pulse shows. The job market is softening slowly, not collapsing.'}
+    ],
+    'Policy interest rate': [
+      {h:'ECB holds at 2.50%, and Lagarde will leave early', src:'Cyprus Mail', date:'29 Oct 2026', url:'https://cyprus-mail.com/2026/10/29/ecb-holds-interest-rates-steady-as-energy-shock-threatens-inflation-and-growth',
+       sum:'The ECB kept its deposit rate at 2.50% after September’s rise and said it is not committing to any path. President Christine Lagarde will step down on 7 February 2027, about nine months before her term ends.',
+       means:'A pause, not necessarily the end: another rise is possible if energy keeps inflation up. A new ECB president could change the tone next year.'},
+      {h:'ECB raised rates in September as energy lifted inflation', src:'Euronews', date:'10 Sep 2026', url:'https://www.euronews.com/2026/09/10/ecb-hikes-rates-to-25-as-energy-shock-pushes-eurozone-inflation-higher',
+       sum:'The deposit rate rose from 2.25% to 2.50%, the second increase since June, after euro-area inflation hit 3.3% in August, almost entirely because of energy.',
+       means:'Borrowing is more expensive for German households and firms than at the start of the year.'}
+    ],
+    'US dollars per euro': [
+      {h:'Euro slides to an 18-month low against the dollar', src:'Trading Economics', date:'13 Nov 2026', url:'https://tradingeconomics.com/euro-area/currency/news/601110',
+       sum:'The euro fell to about $1.11, its lowest since May 2025, and is down about 4.9% over 12 months as markets expect US rates to rise faster than euro rates.',
+       means:'Pulse’s October average was $1.12, so November is weaker so far. A cheaper euro helps German exporters but makes dollar-priced imports like oil more expensive.'}
+    ],
+    'Goods trade balance': [
+      {h:'September: exports up 2%, but the surplus narrows to €15.6bn', src:'Morningstar / Dow Jones', date:'9 Nov 2026', url:'https://www.morningstar.com/news/dow-jones/202611091329/german-trade-surplus-narrows-despite-rising-exports',
+       sum:'Exports rose 2.0% on August to €141.1 billion, but imports grew faster (4.2%), so the surplus fell to €15.6 billion from €17.9 billion.',
+       means:'Imports are growing faster than exports, so the surplus is shrinking. This is the figure Pulse shows.'},
+      {h:'Sales to the US and China slip; Europe carries the gains', src:'Morningstar / Dow Jones', date:'9 Nov 2026', url:'https://www.morningstar.com/news/dow-jones/202611091596/german-trade-surplus-narrows-despite-rising-exports-update',
+       sum:'Exports to other EU countries rose 3.5%, while sales to the US fell 0.5% and to China 5.2%. Germany bought €17.3 billion of goods from China, more than three times what it sold there.',
+       means:'US tariffs and Chinese competition are pushing German exporters to lean on Europe.'}
+    ],
+    'Public debt': [
+      {h:'Bundesbank sees debt climbing toward 70% of GDP by 2028', src:'Deutsche Bundesbank', date:'Aug 2026', url:'https://publikationen.bundesbank.de/content/1004734',
+       sum:'The central bank expects the deficit to grow to about 5% of GDP and debt to about 70% by 2028, as spending rises. It notes Germany’s debt is still low by international standards and it keeps the best credit rating.',
+       means:'Debt is rising on purpose, to pay for defence and infrastructure. The Bundesbank’s 63.5% for 2025 came from the spring figures; Eurostat’s October update, after GDP was revised up, puts it at 62.8%, the figure Pulse shows.'},
+      {h:'Draft 2027 budget includes over €200 billion of new borrowing', src:'Reuters via Investing.com', date:'6 Jul 2026', url:'https://www.investing.com/news/economic-indicators/german-cabinet-approves-2027-draft-budget-hikes-defence-investment-spending-4777033',
+       sum:'Planned borrowing adds up to €118.7 billion in the core budget, €54.9 billion through the infrastructure fund and €30 billion from a special defence fund.',
+       means:'A big shift for a country known for strict debt limits. The test is whether the spending lifts growth enough to justify it.'}
+    ]
+  }
+};
+const newsOpen = new Set();   /* which dropdowns are open, so they stay open when the panel redraws */
+function newsDrop(id, n){
+  const L = (IND_NEWS[id] || {})[n] || []; if (!L.length) return '';
+  const key = id + '|' + n;
+  return `<details class="inews" data-key="${esc(key)}"${newsOpen.has(key) ? ' open' : ''}>
+    <summary><span>Recent news</span><span class="cnt">${L.length}</span><span class="lat">latest ${L[0].date}</span>
+      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+    <div class="ilist">${L.map(x => `<article class="inew">
+      <div class="meta">${x.src} · ${x.date}</div>
+      <h4>${x.h}</h4>
+      <p>${x.sum}</p>
+      <div class="means"><span>WHAT IT COULD MEAN · PULSE’S READING</span>${x.means}</div>
+      <a href="${x.url}" target="_blank" rel="noopener noreferrer">Read the source ↗</a></article>`).join('')}</div></details>`;
+}
+
+/* ---------- history for charts (real, from the Pulse test database, 16 Nov 2026) ---------- */
+const HIST = {"458":{"gdp":[["2016-01",4.3],["2016-04",4.2],["2016-07",4.5],["2016-10",4.8],["2017-01",5.6],["2017-04",5.7],["2017-07",6.1],["2017-10",5.8],["2018-01",5.3],["2018-04",4.8],["2018-07",4.5],["2018-10",4.8],["2019-01",4.7],["2019-04",4.9],["2019-07",4.5],["2019-10",3.6],["2020-01",0.7],["2020-04",-16.9],["2020-07",-2.5],["2020-10",-3.2],["2021-01",-0.2],["2021-04",16.3],["2021-07",-4.2],["2021-10",3.5],["2022-01",5.1],["2022-04",9.2],["2022-07",14.6],["2022-10",7.4],["2023-01",5.7],["2023-04",2.7],["2023-07",3.1],["2023-10",2.9],["2024-01",4.2],["2024-04",6.0],["2024-07",5.5],["2024-10",5.0],["2025-01",4.4],["2025-04",4.6],["2025-07",5.3],["2025-10",6.2],["2026-01",5.4],["2026-04",6.0],["2026-07",5.5]],"cpi":[["2016-01",3.53],["2016-02",4.19],["2016-03",2.61],["2016-04",2.14],["2016-05",2.05],["2016-06",1.59],["2016-07",1.05],["2016-08",1.49],["2016-09",1.5],["2016-10",1.4],["2016-11",1.74],["2016-12",1.74],["2017-01",3.14],["2017-02",4.45],["2017-03",4.92],["2017-04",4.29],["2017-05",3.84],["2017-06",3.4],["2017-07",3.13],["2017-08",3.63],["2017-09",4.16],["2017-10",3.72],["2017-11",3.42],["2017-12",3.51],["2018-01",2.71],["2018-02",1.42],["2018-03",1.26],["2018-04",1.43],["2018-05",1.76],["2018-06",0.76],["2018-07",0.93],["2018-08",0.17],["2018-09",0.33],["2018-10",0.58],["2018-11",0.17],["2018-12",0.17],["2019-01",-0.66],["2019-02",-0.41],["2019-03",0.17],["2019-04",0.17],["2019-05",0.25],["2019-06",1.51],["2019-07",1.42],["2019-08",1.5],["2019-09",1.08],["2019-10",1.08],["2019-11",0.91],["2019-12",0.99],["2020-01",1.58],["2020-02",1.32],["2020-03",-0.17],["2020-04",-2.89],["2020-05",-2.88],["2020-06",-1.89],["2020-07",-1.32],["2020-08",-1.4],["2020-09",-1.4],["2020-10",-1.48],["2020-11",-1.72],["2020-12",-1.39],["2021-01",-0.25],["2021-02",0.08],["2021-03",1.65],["2021-04",4.68],["2021-05",4.41],["2021-06",3.44],["2021-07",2.17],["2021-08",2.0],["2021-09",2.25],["2021-10",2.91],["2021-11",3.33],["2021-12",3.23],["2022-01",2.29],["2022-02",2.2],["2022-03",2.2],["2022-04",2.27],["2022-05",2.84],["2022-06",3.41],["2022-07",4.41],["2022-08",4.65],["2022-09",4.48],["2022-10",3.96],["2022-11",4.03],["2022-12",3.78],["2023-01",3.68],["2023-02",3.67],["2023-03",3.42],["2023-04",3.26],["2023-05",2.84],["2023-06",2.35],["2023-07",2.03],["2023-08",1.95],["2023-09",1.95],["2023-10",1.79],["2023-11",1.47],["2023-12",1.55],["2024-01",1.47],["2024-02",1.77],["2024-03",1.77],["2024-04",1.85],["2024-05",2.0],["2024-06",1.99],["2024-07",1.99],["2024-08",1.91],["2024-09",1.83],["2024-10",1.91],["2024-11",1.83],["2024-12",1.68],["2025-01",1.67],["2025-02",1.51],["2025-03",1.44],["2025-04",1.44],["2025-05",1.2],["2025-06",1.13],["2025-07",1.2],["2025-08",1.28],["2025-09",1.5],["2025-10",1.27],["2025-11",1.35],["2025-12",1.57],["2026-01",1.57],["2026-02",1.42],["2026-03",1.72],["2026-04",1.94],["2026-05",2.01],["2026-06",1.93],["2026-07",1.78],["2026-08",1.93],["2026-09",1.78]],"une":[["2016-01",3.3],["2016-02",3.3],["2016-03",3.4],["2016-04",3.5],["2016-05",3.5],["2016-06",3.4],["2016-07",3.5],["2016-08",3.5],["2016-09",3.5],["2016-10",3.5],["2016-11",3.5],["2016-12",3.4],["2017-01",3.3],["2017-02",3.3],["2017-03",3.4],["2017-04",3.4],["2017-05",3.4],["2017-06",3.4],["2017-07",3.4],["2017-08",3.5],["2017-09",3.4],["2017-10",3.4],["2017-11",3.4],["2017-12",3.3],["2018-01",3.3],["2018-02",3.2],["2018-03",3.3],["2018-04",3.3],["2018-05",3.3],["2018-06",3.4],["2018-07",3.4],["2018-08",3.4],["2018-09",3.4],["2018-10",3.4],["2018-11",3.4],["2018-12",3.3],["2019-01",3.2],["2019-02",3.3],["2019-03",3.3],["2019-04",3.4],["2019-05",3.4],["2019-06",3.4],["2019-07",3.3],["2019-08",3.3],["2019-09",3.3],["2019-10",3.3],["2019-11",3.3],["2019-12",3.3],["2020-01",3.3],["2020-02",3.3],["2020-03",3.8],["2020-04",4.9],["2020-05",5.2],["2020-06",4.8],["2020-07",4.6],["2020-08",4.6],["2020-09",4.7],["2020-10",4.8],["2020-11",4.9],["2020-12",5.0],["2021-01",4.9],["2021-02",4.9],["2021-03",4.7],["2021-04",4.5],["2021-05",4.5],["2021-06",4.7],["2021-07",4.7],["2021-08",4.6],["2021-09",4.5],["2021-10",4.4],["2021-11",4.4],["2021-12",4.3],["2022-01",4.2],["2022-02",4.1],["2022-03",4.1],["2022-04",3.9],["2022-05",3.8],["2022-06",3.6],["2022-07",3.6],["2022-08",3.6],["2022-09",3.7],["2022-10",3.7],["2022-11",3.7],["2022-12",3.7],["2023-01",3.6],["2023-02",3.5],["2023-03",3.5],["2023-04",3.5],["2023-05",3.4],["2023-06",3.3],["2023-07",3.3],["2023-08",3.4],["2023-09",3.4],["2023-10",3.4],["2023-11",3.4],["2023-12",3.4],["2024-01",3.3],["2024-02",3.3],["2024-03",3.3],["2024-04",3.3],["2024-05",3.3],["2024-06",3.2],["2024-07",3.2],["2024-08",3.2],["2024-09",3.2],["2024-10",3.2],["2024-11",3.2],["2024-12",3.2],["2025-01",3.1],["2025-02",3.1],["2025-03",3.1],["2025-04",3.1],["2025-05",3.1],["2025-06",3.0],["2025-07",3.0],["2025-08",3.0],["2025-09",3.0],["2025-10",3.0],["2025-11",3.0],["2025-12",2.9],["2026-01",3.0],["2026-02",2.9],["2026-03",2.9],["2026-04",2.9],["2026-05",3.0],["2026-06",3.0],["2026-07",3.0],["2026-08",2.9],["2026-09",3.0]],"rate":[["2016-01",3.25],["2016-02",3.25],["2016-03",3.25],["2016-04",3.25],["2016-05",3.25],["2016-06",3.25],["2016-07",3.0],["2016-08",3.0],["2016-09",3.0],["2016-10",3.0],["2016-11",3.0],["2016-12",3.0],["2017-01",3.0],["2017-02",3.0],["2017-03",3.0],["2017-04",3.0],["2017-05",3.0],["2017-06",3.0],["2017-07",3.0],["2017-08",3.0],["2017-09",3.0],["2017-10",3.0],["2017-11",3.0],["2017-12",3.0],["2018-01",3.25],["2018-02",3.25],["2018-03",3.25],["2018-04",3.25],["2018-05",3.25],["2018-06",3.25],["2018-07",3.25],["2018-08",3.25],["2018-09",3.25],["2018-10",3.25],["2018-11",3.25],["2018-12",3.25],["2019-01",3.25],["2019-02",3.25],["2019-03",3.25],["2019-04",3.25],["2019-05",3.0],["2019-06",3.0],["2019-07",3.0],["2019-08",3.0],["2019-09",3.0],["2019-10",3.0],["2019-11",3.0],["2019-12",3.0],["2020-01",2.75],["2020-02",2.75],["2020-03",2.5],["2020-04",2.5],["2020-05",2.0],["2020-06",2.0],["2020-07",1.75],["2020-08",1.75],["2020-09",1.75],["2020-10",1.75],["2020-11",1.75],["2020-12",1.75],["2021-01",1.75],["2021-02",1.75],["2021-03",1.75],["2021-04",1.75],["2021-05",1.75],["2021-06",1.75],["2021-07",1.75],["2021-08",1.75],["2021-09",1.75],["2021-10",1.75],["2021-11",1.75],["2021-12",1.75],["2022-01",1.75],["2022-02",1.75],["2022-03",1.75],["2022-04",1.75],["2022-05",2.0],["2022-06",2.0],["2022-07",2.25],["2022-08",2.25],["2022-09",2.5],["2022-10",2.5],["2022-11",2.75],["2022-12",2.75],["2023-01",2.75],["2023-02",2.75],["2023-03",2.75],["2023-04",2.75],["2023-05",3.0],["2023-06",3.0],["2023-07",3.0],["2023-08",3.0],["2023-09",3.0],["2023-10",3.0],["2023-11",3.0],["2023-12",3.0],["2024-01",3.0],["2024-02",3.0],["2024-03",3.0],["2024-04",3.0],["2024-05",3.0],["2024-06",3.0],["2024-07",3.0],["2024-08",3.0],["2024-09",3.0],["2024-10",3.0],["2024-11",3.0],["2024-12",3.0],["2025-01",3.0],["2025-02",3.0],["2025-03",3.0],["2025-04",3.0],["2025-05",3.0],["2025-06",3.0],["2025-07",2.75],["2025-08",2.75],["2025-09",2.75],["2025-10",2.75],["2025-11",2.75],["2025-12",2.75],["2026-01",2.75],["2026-02",2.75],["2026-03",2.75],["2026-04",2.75],["2026-05",2.75],["2026-06",2.75],["2026-07",2.75],["2026-08",2.75],["2026-09",2.75],["2026-10",2.75],["2026-11",2.75]]},"276":{"gdp":[["2016-01",2.5],["2016-04",2.2],["2016-07",2.1],["2016-10",2.0],["2017-01",2.4],["2017-04",2.9],["2017-07",3.4],["2017-10",4.0],["2018-01",2.2],["2018-04",2.1],["2018-07",0.8],["2018-10",0.1],["2019-01",1.4],["2019-04",0.7],["2019-07",1.7],["2019-10",0.8],["2020-01",-1.8],["2020-04",-10.6],["2020-07",-3.3],["2020-10",-2.0],["2021-01",-0.6],["2021-04",11.6],["2021-07",2.8],["2021-10",2.4],["2022-01",3.7],["2022-04",1.5],["2022-07",1.7],["2022-10",0.9],["2023-01",-0.6],["2023-04",-0.8],["2023-07",-1.0],["2023-10",-0.9],["2024-01",0.0],["2024-04",-0.1],["2024-07",-0.1],["2024-10",0.4],["2025-01",0.3],["2025-04",0.4],["2025-07",0.3],["2025-10",0.3],["2026-01",0.6],["2026-04",1.0],["2026-07",1.2]],"cpi":[["2016-01",0.4],["2016-02",-0.1],["2016-03",0.1],["2016-04",-0.3],["2016-05",-0.1],["2016-06",0.1],["2016-07",0.4],["2016-08",0.3],["2016-09",0.5],["2016-10",0.7],["2016-11",0.7],["2016-12",1.6],["2017-01",1.8],["2017-02",2.1],["2017-03",1.5],["2017-04",2.0],["2017-05",1.4],["2017-06",1.7],["2017-07",1.7],["2017-08",1.9],["2017-09",1.9],["2017-10",1.5],["2017-11",1.8],["2017-12",1.5],["2018-01",1.4],["2018-02",1.2],["2018-03",1.7],["2018-04",1.3],["2018-05",2.4],["2018-06",2.0],["2018-07",2.2],["2018-08",2.1],["2018-09",2.2],["2018-10",2.6],["2018-11",2.1],["2018-12",1.6],["2019-01",1.7],["2019-02",1.7],["2019-03",1.4],["2019-04",2.1],["2019-05",1.3],["2019-06",1.6],["2019-07",1.2],["2019-08",1.0],["2019-09",0.9],["2019-10",0.8],["2019-11",1.2],["2019-12",1.6],["2020-01",1.7],["2020-02",1.7],["2020-03",1.3],["2020-04",0.8],["2020-05",0.5],["2020-06",0.8],["2020-07",0.0],["2020-08",-0.1],["2020-09",-0.4],["2020-10",-0.4],["2020-11",-0.7],["2020-12",-0.6],["2021-01",1.6],["2021-02",1.6],["2021-03",2.0],["2021-04",2.0],["2021-05",2.4],["2021-06",2.0],["2021-07",3.1],["2021-08",3.4],["2021-09",4.0],["2021-10",4.6],["2021-11",6.0],["2021-12",5.7],["2022-01",5.1],["2022-02",5.4],["2022-03",7.6],["2022-04",7.9],["2022-05",8.6],["2022-06",8.3],["2022-07",8.4],["2022-08",8.8],["2022-09",11.0],["2022-10",11.6],["2022-11",11.3],["2022-12",9.6],["2023-01",9.2],["2023-02",9.3],["2023-03",7.7],["2023-04",7.5],["2023-05",6.3],["2023-06",6.7],["2023-07",6.5],["2023-08",6.4],["2023-09",4.3],["2023-10",2.9],["2023-11",2.3],["2023-12",3.7],["2024-01",3.0],["2024-02",2.7],["2024-03",2.4],["2024-04",2.4],["2024-05",2.8],["2024-06",2.6],["2024-07",2.6],["2024-08",2.1],["2024-09",1.9],["2024-10",2.4],["2024-11",2.4],["2024-12",2.8],["2025-01",2.8],["2025-02",2.6],["2025-03",2.3],["2025-04",2.2],["2025-05",2.1],["2025-06",2.0],["2025-07",1.9],["2025-08",2.0],["2025-09",2.3],["2025-10",2.3],["2025-11",2.5],["2025-12",2.0],["2026-01",2.1],["2026-02",2.0],["2026-03",2.8],["2026-04",2.9],["2026-05",2.7],["2026-06",2.4],["2026-07",2.8],["2026-08",2.9],["2026-09",3.3],["2026-10",2.9]],"une":[["2016-01",4.1],["2016-02",4.1],["2016-03",4.0],["2016-04",4.0],["2016-05",4.0],["2016-06",4.0],["2016-07",3.9],["2016-08",3.9],["2016-09",3.8],["2016-10",3.7],["2016-11",3.7],["2016-12",3.7],["2017-01",3.7],["2017-02",3.6],["2017-03",3.6],["2017-04",3.6],["2017-05",3.6],["2017-06",3.5],["2017-07",3.5],["2017-08",3.5],["2017-09",3.4],["2017-10",3.4],["2017-11",3.4],["2017-12",3.4],["2018-01",3.3],["2018-02",3.3],["2018-03",3.3],["2018-04",3.2],["2018-05",3.2],["2018-06",3.2],["2018-07",3.2],["2018-08",3.2],["2018-09",3.1],["2018-10",3.1],["2018-11",3.1],["2018-12",3.1],["2019-01",3.0],["2019-02",3.0],["2019-03",3.0],["2019-04",2.9],["2019-05",2.9],["2019-06",2.9],["2019-07",2.9],["2019-08",2.9],["2019-09",2.9],["2019-10",2.9],["2019-11",3.0],["2019-12",3.1],["2020-01",3.2],["2020-02",3.3],["2020-03",3.4],["2020-04",3.5],["2020-05",3.7],["2020-06",3.8],["2020-07",3.8],["2020-08",3.9],["2020-09",3.8],["2020-10",3.8],["2020-11",3.8],["2020-12",3.8],["2021-01",3.9],["2021-02",3.9],["2021-03",3.9],["2021-04",3.8],["2021-05",3.7],["2021-06",3.6],["2021-07",3.5],["2021-08",3.4],["2021-09",3.4],["2021-10",3.4],["2021-11",3.4],["2021-12",3.4],["2022-01",3.3],["2022-02",3.2],["2022-03",3.2],["2022-04",3.1],["2022-05",3.1],["2022-06",3.1],["2022-07",3.1],["2022-08",3.1],["2022-09",3.1],["2022-10",3.1],["2022-11",3.1],["2022-12",3.1],["2023-01",3.1],["2023-02",3.0],["2023-03",3.0],["2023-04",3.0],["2023-05",3.0],["2023-06",3.0],["2023-07",3.0],["2023-08",3.1],["2023-09",3.1],["2023-10",3.1],["2023-11",3.2],["2023-12",3.2],["2024-01",3.2],["2024-02",3.3],["2024-03",3.3],["2024-04",3.4],["2024-05",3.4],["2024-06",3.4],["2024-07",3.4],["2024-08",3.4],["2024-09",3.4],["2024-10",3.4],["2024-11",3.4],["2024-12",3.5],["2025-01",3.5],["2025-02",3.6],["2025-03",3.6],["2025-04",3.7],["2025-05",3.7],["2025-06",3.7],["2025-07",3.8],["2025-08",3.8],["2025-09",3.8],["2025-10",3.8],["2025-11",3.9],["2025-12",3.9],["2026-01",3.9],["2026-02",3.9],["2026-03",3.9],["2026-04",3.9],["2026-05",3.9],["2026-06",4.0],["2026-07",4.0],["2026-08",4.1],["2026-09",4.1]],"rate":[["2016-01",-0.3],["2016-02",-0.3],["2016-03",-0.4],["2016-04",-0.4],["2016-05",-0.4],["2016-06",-0.4],["2016-07",-0.4],["2016-08",-0.4],["2016-09",-0.4],["2016-10",-0.4],["2016-11",-0.4],["2016-12",-0.4],["2017-01",-0.4],["2017-02",-0.4],["2017-03",-0.4],["2017-04",-0.4],["2017-05",-0.4],["2017-06",-0.4],["2017-07",-0.4],["2017-08",-0.4],["2017-09",-0.4],["2017-10",-0.4],["2017-11",-0.4],["2017-12",-0.4],["2018-01",-0.4],["2018-02",-0.4],["2018-03",-0.4],["2018-04",-0.4],["2018-05",-0.4],["2018-06",-0.4],["2018-07",-0.4],["2018-08",-0.4],["2018-09",-0.4],["2018-10",-0.4],["2018-11",-0.4],["2018-12",-0.4],["2019-01",-0.4],["2019-02",-0.4],["2019-03",-0.4],["2019-04",-0.4],["2019-05",-0.4],["2019-06",-0.4],["2019-07",-0.4],["2019-08",-0.4],["2019-09",-0.5],["2019-10",-0.5],["2019-11",-0.5],["2019-12",-0.5],["2020-01",-0.5],["2020-02",-0.5],["2020-03",-0.5],["2020-04",-0.5],["2020-05",-0.5],["2020-06",-0.5],["2020-07",-0.5],["2020-08",-0.5],["2020-09",-0.5],["2020-10",-0.5],["2020-11",-0.5],["2020-12",-0.5],["2021-01",-0.5],["2021-02",-0.5],["2021-03",-0.5],["2021-04",-0.5],["2021-05",-0.5],["2021-06",-0.5],["2021-07",-0.5],["2021-08",-0.5],["2021-09",-0.5],["2021-10",-0.5],["2021-11",-0.5],["2021-12",-0.5],["2022-01",-0.5],["2022-02",-0.5],["2022-03",-0.5],["2022-04",-0.5],["2022-05",-0.5],["2022-06",-0.5],["2022-07",0.0],["2022-08",0.0],["2022-09",0.75],["2022-10",0.75],["2022-11",1.5],["2022-12",2.0],["2023-01",2.0],["2023-02",2.5],["2023-03",3.0],["2023-04",3.0],["2023-05",3.25],["2023-06",3.5],["2023-07",3.5],["2023-08",3.75],["2023-09",4.0],["2023-10",4.0],["2023-11",4.0],["2023-12",4.0],["2024-01",4.0],["2024-02",4.0],["2024-03",4.0],["2024-04",4.0],["2024-05",4.0],["2024-06",3.75],["2024-07",3.75],["2024-08",3.75],["2024-09",3.5],["2024-10",3.25],["2024-11",3.25],["2024-12",3.0],["2025-01",3.0],["2025-02",2.75],["2025-03",2.5],["2025-04",2.25],["2025-05",2.25],["2025-06",2.0],["2025-07",2.0],["2025-08",2.0],["2025-09",2.0],["2025-10",2.0],["2025-11",2.0],["2025-12",2.0],["2026-01",2.0],["2026-02",2.0],["2026-03",2.0],["2026-04",2.0],["2026-05",2.0],["2026-06",2.25],["2026-07",2.25],["2026-08",2.25],["2026-09",2.5],["2026-10",2.5],["2026-11",2.5]]}};
+/* score history is a SAMPLE, like the current score */
+const SCORE_HIST = {
+  '458': [[2016,64],[2017,67],[2018,66],[2019,66],[2020,52],[2021,58],[2022,66],[2023,63],[2024,66],[2025,67],[2026,68]],
+  '276': [[2016,70],[2017,72],[2018,70],[2019,67],[2020,58],[2021,63],[2022,60],[2023,59],[2024,60],[2025,61],[2026,64]]
+};
+/* each country keeps one colour in every chart (validated for the dark panel) */
+const CCOL = {'458':'#3987e5', '276':'#d95926'};
+const SURF = '#0f1729';
+
+/* ---------- flags & icons (drawn as SVG) ---------- */
+function starPts(cx, cy, n, R, r){ const p = []; for (let i = 0; i < 2*n; i++){ const a = -Math.PI/2 + i*Math.PI/n, rr = i%2 ? r : R; p.push((cx+rr*Math.cos(a)).toFixed(2)+','+(cy+rr*Math.sin(a)).toFixed(2)); } return p.join(' '); }
+const FLAGS = {
+  '276': w => `<svg class="FLAGCLS" width="${w}" viewBox="0 0 5 3" role="img" aria-label="Flag of Germany"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#DD0000"/><rect y="2" width="5" height="1" fill="#FFCE00"/></svg>`,
+  '458': w => { let s = ''; for (let i = 0; i < 14; i++) s += `<rect y="${i}" width="28" height="1" fill="${i%2 ? '#fff' : '#CC0001'}"/>`;
+    return `<svg class="FLAGCLS" width="${w}" viewBox="0 0 28 14" role="img" aria-label="Flag of Malaysia">${s}<rect width="14" height="8" fill="#010066"/><circle cx="5.6" cy="4" r="3.1" fill="#FC0"/><circle cx="6.4" cy="4" r="2.55" fill="#010066"/><polygon points="${starPts(10.2,4,14,2.5,1.05)}" fill="#FC0"/></svg>`; }
+};
+const flag = (id, w, cls) => FLAGS[id] ? FLAGS[id](w).replace('FLAGCLS', cls || 'flag') : '';
+const ICO = {
+  'Economic Growth': '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  'Financial Stability': '<path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+  'International Trade': '<path d="M4 8h13l-3-3"/><path d="M20 16H7l3 3"/>',
+  'Investment Environment': '<path d="M4 21V10l5-3v14M9 21V4l7 4v13M16 21v-8l4 2v6"/><path d="M2 21h20"/>',
+  'Government & Fiscal': '<path d="M3 9l9-5 9 5"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 21h18"/>',
+  'Industry & Competitiveness': '<path d="M3 21V11l5 3V11l5 3V7h3l1 7 4 0v7z"/><path d="M2 21h20"/>'
+};
+const icon = (name, s) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICO[name] || ''}</svg>`;
+/* a simple skyline silhouette for the panel banner */
+const SKY = {
+  '458': '<path d="M0 120V96h18V80h10v16h12V70h8V58h4v-8h2v8h4v12h8v50h6V40l4-14 4 14v80h4V40l4-14 4 14v80h8V84h16v-6h10v42h14V92h20v28h12V76h18v44z"/>',
+  '276': '<path d="M0 120V92h16V78h12v14h10V66l8-10 8 10v54h10V88h12V60h4V30h2v-8h2v8h2v30h4v60h12V82l10-8 10 8v38h10V70h6l6-12 6 12h6v50h16V90h18v30z"/>'
+};
+
+/* ---------- charts ---------- */
+const pd = s => new Date(+s.slice(0,4), +s.slice(5,7)-1, 1);
+const qlab = s => `Q${(+s.slice(5,7)-1)/3+1} ${s.slice(0,4)}`;
+const mlab = s => d3.timeFormat('%b %Y')(pd(s));
+const pct = v => (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+const pct2 = v => v.toFixed(2) + '%';
+
+function lineChart(host, o){
+  const W = Math.max(280, host.clientWidth || 340), H = o.h || 190;
+  const labelled = o.series.length > 1 || o.endLabel;
+  const m = {t:16, r: labelled ? 64 : 14, b:24, l:36};
+  const all = o.series.flatMap(s => s.data);
+  const x = d3.scaleTime().domain(d3.extent(all, d => d[0])).range([m.l, W-m.r]);
+  const y = d3.scaleLinear().domain(o.y || d3.extent(all, d => d[1])).nice(5).range([H-m.b, m.t]);
+  const svg = d3.select(host).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', '100%').attr('role', 'img').attr('aria-label', o.aria);
+  const yt = y.ticks(5);
+  svg.append('g').selectAll('line').data(yt).join('line').attr('x1', m.l).attr('x2', W-m.r).attr('y1', y).attr('y2', y)
+    .attr('stroke', d => (d === 0 && o.zero) ? 'rgba(242,245,250,.42)' : 'rgba(163,177,198,.13)');
+  svg.append('g').selectAll('text').data(yt).join('text').attr('class', 'ax').attr('x', m.l-6).attr('y', d => y(d)+3.5).attr('text-anchor', 'end').text(o.tick || (d => d));
+  svg.append('g').selectAll('text').data(x.ticks(W < 360 ? 4 : 5)).join('text').attr('class', 'ax').attr('x', x).attr('y', H-7).attr('text-anchor', 'middle').text(d3.timeFormat('%Y'));
+  (o.notes || []).forEach(n => {
+    const nx = x(n.x);
+    svg.append('line').attr('x1', nx).attr('x2', nx).attr('y1', m.t-2).attr('y2', H-m.b).attr('stroke', 'rgba(163,177,198,.45)').attr('stroke-dasharray', '3 3');
+    svg.append('text').attr('class', 'ann').attr('x', nx+5).attr('y', m.t+(n.dy || 6)).text(n.text);
+  });
+  if (o.band) o.band(svg, x, y, m, W, H);
+  const ends = [];
+  o.series.forEach(s => {
+    const line = d3.line().x(d => x(d[0])).y(d => y(d[1])).curve(s.step ? d3.curveStepAfter : d3.curveMonotoneX);
+    svg.append('path').attr('d', line(s.data)).attr('fill', 'none').attr('stroke', s.color).attr('stroke-width', s.width || 2)
+      .attr('stroke-dasharray', s.dash || null).attr('stroke-linejoin', 'round').attr('stroke-linecap', 'round').attr('opacity', s.opacity || 1);
+    if (s.dots) svg.append('g').selectAll('circle').data(s.data).join('circle').attr('cx', d => x(d[0])).attr('cy', d => y(d[1])).attr('r', 4.5)
+      .attr('fill', d => s.dots(d[1])).attr('stroke', SURF).attr('stroke-width', 2);
+    const L = s.data[s.data.length-1];
+    if (!s.dots) svg.append('circle').attr('cx', x(L[0])).attr('cy', y(L[1])).attr('r', 4).attr('fill', s.color).attr('stroke', SURF).attr('stroke-width', 2);
+    if (labelled) ends.push({s, y: y(L[1]), x: x(L[0])});
+  });
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i-1].y < 13) ends[i].y = ends[i-1].y + 13;
+  ends.forEach(e => svg.append('text').attr('class', 'lab').attr('x', e.x+8).attr('y', e.y+4).text(e.s.short || e.s.name));
+  /* hover: crosshair + tooltip */
+  host.style.position = 'relative';
+  const cross = svg.append('line').attr('y1', m.t-4).attr('y2', H-m.b).attr('stroke', 'rgba(242,245,250,.55)').style('display', 'none');
+  const hl = svg.append('g');
+  const tip = d3.select(host).append('div').attr('class', 'ctip').style('display', 'none');
+  const dates = Array.from(new Set(all.map(d => +d[0]))).sort((a, b) => a - b);
+  const move = ev => {
+    const [px] = d3.pointer(ev, svg.node());
+    const dt = dates[d3.bisectCenter(dates, +x.invert(px))];
+    const rows = o.series.map(s => [s, s.data.find(d => +d[0] === dt)]).filter(r => r[1]);
+    if (!rows.length) return;
+    cross.attr('x1', x(dt)).attr('x2', x(dt)).style('display', null);
+    hl.selectAll('circle').data(rows).join('circle').attr('cx', x(dt)).attr('cy', r => y(r[1][1])).attr('r', 5)
+      .attr('fill', r => r[0].dots ? r[0].dots(r[1][1]) : r[0].color).attr('stroke', SURF).attr('stroke-width', 2);
+    tip.html(`<b>${rows[0][1][2]}</b>` + rows.map(([s, p]) => `<div><i style="background:${s.dots ? s.dots(p[1]) : s.color}"></i>${s.name}<span>${(s.fmt || o.fmt)(p[1])}</span></div>`).join(''));
+    const k = host.clientWidth / W, tw = tip.node().offsetWidth, px2 = x(dt)*k;
+    tip.style('display', null).style('left', Math.min(Math.max(0, px2 + (px2 > host.clientWidth/2 ? -tw-12 : 12)), host.clientWidth - tw) + 'px');
+  };
+  svg.append('rect').attr('x', m.l).attr('y', 0).attr('width', W-m.l-m.r+6).attr('height', H).attr('fill', 'transparent').style('cursor', 'crosshair')
+    .on('pointermove pointerdown', move)
+    .on('pointerleave', () => { cross.style('display', 'none'); hl.selectAll('*').remove(); tip.style('display', 'none'); });
+}
+
+function tableHTML(cols, rows){
+  return `<details class="tbl"><summary>Show as table</summary><div class="wrap"><table><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+}
+const other = id => Object.keys(DATA).find(k => k !== id);
+
+/* chart blocks: return HTML with a placeholder, then draw() after it is in the page */
+function scoreBlock(id){
+  const s = SCORE_HIST[id];
+  return `<div class="chart"><div class="ct"><b>Score over time</b><span class="badge">SAMPLE</span></div>
+    <p class="cs">Overall score each year, 2016–2026. Dots use the same colours as the globe. Sample numbers until the scoring method is approved.</p>
+    <div class="plot" data-chart="score"></div>${tableHTML(['Year', 'Score'], s.slice().reverse().map(([yr, v]) => [yr, v]))}</div>`;
+}
+function drawScore(el, id){
+  lineChart(el, {h:170, y:[0,100], fmt: v => v + ' / 100', aria: `${DATA[id].name} sample score by year, 2016 to 2026`,
+    notes:[{x: new Date(2020,0,1), text:'COVID-19'}],
+    band: (svg, x, y, m) => { const g = svg.append('defs').append('linearGradient').attr('id', 'sg'+id).attr('x1', 0).attr('x2', 0).attr('y1', 1).attr('y2', 0);
+      [0,25,50,75,100].forEach(v => g.append('stop').attr('offset', v + '%').attr('stop-color', scale(v)));
+      svg.append('rect').attr('x', 3).attr('y', y(100)).attr('width', 3).attr('height', y(0)-y(100)).attr('rx', 1.5).attr('fill', `url(#sg${id})`); },
+    series:[{name:'Score', color:'rgba(201,211,226,.7)', width:2, dots: v => scale(v), data: SCORE_HIST[id].map(([yr, v]) => [new Date(yr,0,1), v, String(yr)])}]});
+}
+/* ---------- compare: the country you're viewing is always blue; each country you add gets the next colour and keeps it until removed ---------- */
+const MAIN = '#3987e5';
+const CSLOTS = ['#d95926', '#199e70', '#c98500'];   /* validated dark-mode slots 2–4 */
+const MAXCMP = CSLOTS.length;
+const GSRC = {'458':'DOSM', '276':'Eurostat'};
+const CMP = {};          /* CMP[viewedId] = [{id, c}] */
+let cmpOpen = false;
+function cmpList(id){
+  if (!CMP[id]){ const o = other(id); CMP[id] = o ? [{id:o, c:CSLOTS[0]}] : []; }
+  return CMP[id].filter(x => DATA[x.id] && HIST[x.id]);
+}
+function addCmp(id, k){
+  const L = cmpList(id); if (L.length >= MAXCMP || L.some(x => x.id === k) || k === id) return;
+  const used = L.map(x => x.c); CMP[id] = L.concat([{id:k, c: CSLOTS.find(c => !used.includes(c))}]);
+}
+function growthBlock(id, big){
+  const L = cmpList(id), ids = [id].concat(L.map(x => x.id));
+  const chips = L.map(x => `<span class="cchip"><i style="background:${x.c}"></i>${DATA[x.id].name}<button type="button" class="cx" data-rm="${x.id}" aria-label="Stop comparing with ${DATA[x.id].name}">×</button></span>`).join('');
+  const addBtn = L.length < MAXCMP ? (cmpOpen
+      ? `<div class="cadd"><input type="search" class="cin" placeholder="Type a country…" aria-label="Country to compare with" autocomplete="off"><ul class="clist" role="listbox"></ul></div>`
+      : `<button type="button" class="cmp" data-open="1" aria-label="Compare with another country">+ Compare</button>`) : '';
+  const periods = ids.flatMap(k => HIST[k].gdp.map(([p]) => p)).filter((p, i, a) => a.indexOf(p) === i).sort().reverse();
+  return `<div class="chart"><div class="ct"><b>Economic growth over time</b></div>
+    <div class="crow"><span class="cchip main"><i style="background:${MAIN}"></i>${DATA[id].name}</span>${chips}${addBtn}</div>
+    <p class="cs">Real GDP growth, % change on the same quarter a year earlier. Above the white line the economy is growing; below it, shrinking.</p>
+    <div class="plot" data-chart="growth"></div>
+    ${tableHTML(['Quarter'].concat(ids.map(k => DATA[k].name)), periods.map(p => [qlab(p)].concat(ids.map(k => { const r = HIST[k].gdp.find(d => d[0] === p); return r ? pct(r[1]) : '–'; }))))}
+    <p class="cs" style="margin-top:6px">Sources: ${ids.map(k => GSRC[k]).filter((v, i, a) => v && a.indexOf(v) === i).join(', ')}. Quarterly, 2016 to latest.</p></div>`;
+}
+function drawGrowth(el, id, big){
+  const L = cmpList(id);
+  const mk = (k, c, main) => ({name: DATA[k].name, color: c, width: main ? 2.4 : 1.6, opacity: main ? 1 : .9, data: HIST[k].gdp.map(([p, v]) => [pd(p), v, qlab(p)])});
+  lineChart(el, {h: big ? 220 : 190, zero: true, fmt: pct, tick: d => d + '%',
+    aria: `Real GDP growth by quarter for ${[id].concat(L.map(x => x.id)).map(k => DATA[k].name).join(', ')}, 2016 to latest`,
+    notes:[{x: new Date(2020,3,1), text:'COVID-19 lockdowns', dy: 4}],
+    series: [mk(id, MAIN, true)].concat(L.map(x => mk(x.id, x.c)))});
+}
+function wireCompare(id){
+  const keep = fn => { const t = panel.scrollTop; fn(); renderPanel(); panel.scrollTop = t; };
+  pbody.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => keep(() => { CMP[id] = cmpList(id).filter(x => x.id !== b.dataset.rm); }));
+  pbody.querySelectorAll('[data-open]').forEach(b => b.onclick = () => keep(() => { cmpOpen = true; }));
+  const inp = pbody.querySelector('.cin'); if (!inp) return;
+  const list = pbody.querySelector('.clist'); let hits = [], act = 0;
+  const L = cmpList(id);
+  const draw = () => {
+    const v = inp.value.trim().toLowerCase();
+    const pool = features.filter(f => f.id !== id && !L.some(x => x.id === f.id));
+    hits = (v ? pool.filter(f => f.properties.name.toLowerCase().includes(v)) : pool.filter(f => DATA[f.id]))
+      .sort((a, b) => (!!DATA[b.id] - !!DATA[a.id]) || a.properties.name.localeCompare(b.properties.name)).slice(0, 7);
+    act = Math.max(0, hits.findIndex(f => DATA[f.id]));
+    list.innerHTML = hits.length ? hits.map((f, i) => DATA[f.id]
+        ? `<li><button type="button" data-pick="${f.id}" class="${i === act ? 'active' : ''}">${flag(f.id, 20, 'cflag').replace('role="img"', 'aria-hidden="true"')}${esc(f.properties.name)}<span class="tag has">Data</span></button></li>`
+        : `<li><button type="button" disabled>${esc(f.properties.name)}<span class="tag">No data yet</span></button></li>`).join('')
+      : `<li class="cnone">No country called “${esc(inp.value)}”</li>`;
+    list.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => keep(() => { addCmp(id, b.dataset.pick); cmpOpen = false; }));
+  };
+  inp.addEventListener('input', draw);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Escape'){ keep(() => { cmpOpen = false; }); }
+    else if (e.key === 'Enter'){ const f = hits[act]; if (f && DATA[f.id]) keep(() => { addCmp(id, f.id); cmpOpen = false; }); e.preventDefault(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+      const ok = hits.map((f, i) => DATA[f.id] ? i : -1).filter(i => i >= 0); if (!ok.length) return;
+      const j = ok.indexOf(act); act = ok[(j + (e.key === 'ArrowDown' ? 1 : ok.length - 1)) % ok.length];
+      list.querySelectorAll('button').forEach((b, i) => b.classList.toggle('active', i === act)); e.preventDefault(); }
+  });
+  inp.addEventListener('blur', () => setTimeout(() => { if (cmpOpen && !pbody.contains(document.activeElement)) keep(() => { cmpOpen = false; }); }, 200));
+  draw(); inp.focus({preventScroll: true});
+}
+function stabilityBlock(id){
+  return `<div class="chart"><div class="ct"><b>Prices and interest rates</b></div>
+    <p class="cs">Inflation (how fast prices are rising, % on a year earlier) and the central bank’s policy rate, monthly since 2016.</p>
+    <div class="lgd"><span><i style="background:${MAIN}"></i>Inflation</span><span><i class="dash"></i>Policy rate</span></div>
+    <div class="plot" data-chart="stab"></div>
+    ${tableHTML(['Month', 'Inflation', 'Policy rate'], HIST[id].cpi.slice().reverse().map(([p, v]) => { const r = HIST[id].rate.find(d => d[0] === p); return [mlab(p), pct2(v), r ? pct2(r[1]) : '–']; }))}
+    <p class="cs" style="margin-top:6px">Sources: ${id === '458' ? 'DOSM (inflation), Bank Negara Malaysia (OPR)' : 'Eurostat HICP (inflation), ECB deposit rate'}.</p></div>`;
+}
+function drawStability(el, id){
+  lineChart(el, {h:200, zero: true, fmt: pct2, tick: d => d + '%', aria: `Inflation and policy interest rate for ${DATA[id].name}, monthly since 2016`,
+    series:[{name:'Inflation', color: MAIN, data: HIST[id].cpi.map(([p, v]) => [pd(p), v, mlab(p)])},
+            {name:'Policy rate', short:'Rate', color:'#A3B1C6', dash:'5 4', step:true, width:1.8, data: HIST[id].rate.map(([p, v]) => [pd(p), v, mlab(p)])}]});
+}
+function unempBlock(id){
+  return `<div class="chart"><div class="ct"><b>Unemployment over time</b></div>
+    <p class="cs">Share of people who want a job but don’t have one, monthly, seasonally adjusted. This smooths out regular seasonal swings, so it can differ by about 0.1 point from the headline figure on the indicator card.</p>
+    <div class="plot" data-chart="une"></div>
+    ${tableHTML(['Month', 'Unemployment'], HIST[id].une.slice().reverse().map(([p, v]) => [mlab(p), pct2(v).replace('.00', '.0')]))}</div>`;
+}
+function drawUnemp(el, id){
+  lineChart(el, {h:170, fmt: v => v.toFixed(1) + '%', tick: d => d.toFixed(1) + '%', aria: `Unemployment rate for ${DATA[id].name}, monthly since 2016`,
+    series:[{name:'Unemployment', color: MAIN, data: HIST[id].une.map(([p, v]) => [pd(p), v, mlab(p)])}]});
+}
+function drawCharts(id, big){
+  pbody.querySelectorAll('[data-chart]').forEach(el => {
+    ({score: drawScore, growth: drawGrowth, stab: drawStability, une: drawUnemp})[el.dataset.chart](el, id, big);
+  });
+  wireCompare(id);
+}
+/* small trend line next to an indicator: last 5 years, grey with the latest point in the country colour */
+const SPARK = {'GDP growth':'gdp', 'Inflation':'cpi', 'Unemployment':'une', 'Policy interest rate':'rate'};
+function spark(id, n){
+  const k = SPARK[n]; if (!k || !HIST[id]) return '';
+  const d = HIST[id][k].filter(([p]) => p >= '2021-10'), w = 92, h = 30;
+  const x = d3.scaleLinear().domain([0, d.length-1]).range([2, w-4]), ext = d3.extent(d, r => r[1]);
+  const y = d3.scaleLinear().domain(ext[0] === ext[1] ? [ext[0]-1, ext[1]+1] : ext).range([h-4, 4]);
+  const line = d3.line().x((r, i) => x(i)).y(r => y(r[1]));
+  const L = d[d.length-1], F = d[0];
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${n} trend since ${(k === 'gdp' ? qlab : mlab)(F[0])}: from ${F[1]} to ${L[1]}"><title>${n}: ${F[1]}% in ${(k === 'gdp' ? qlab : mlab)(F[0])} → ${L[1]}% in ${(k === 'gdp' ? qlab : mlab)(L[0])}</title><path d="${line(d)}" fill="none" stroke="#6F7E96" stroke-width="1.6" stroke-linejoin="round"/><circle cx="${x(d.length-1)}" cy="${y(L[1])}" r="3.2" fill="${MAIN}" stroke="${SURF}" stroke-width="1.5"/></svg>`;
+}
+
+const TONE = {good:'#75E0A7', bad:'#FDA29B', flat:'#A3B1C6'};
+const NAVY = '#1E3A66', OCEAN_IN = '#0D1A35', OCEAN_OUT = '#070E20', BORDER = 'rgba(120,150,200,.35)';
+const scale = d3.scaleLinear().domain([0,25,50,75,100]).range(['#D92D20','#F79009','#FDE272','#47CD89','#079455']).clamp(true);
+
+/* ---------- globe ---------- */
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('globe');
+const ctx = canvas.getContext('2d');
+const projection = d3.geoOrthographic().clipAngle(90).precision(0.4);
+const path = d3.geoPath(projection, ctx);
+const graticule = d3.geoGraticule10();
+let W, H, R0, zoom = 1, features = [], hovered = null, selected = null;
+let rotation = [-60, -15, 0], spinning = true, lastInteract = 0;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduceMotion) spinning = false;
+
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  R0 = Math.min(W, H) * (W < 720 ? 0.40 : 0.38);
+  draw();
+}
+function draw(){
+  if (!W) return;
+  const r = R0 * zoom;
+  projection.scale(r).translate([W/2, H/2 + (W < 720 ? -20 : 10)]).rotate(rotation);
+  const [cx, cy] = projection.translate();
+  ctx.clearRect(0, 0, W, H);
+  // atmosphere glow
+  const glow = ctx.createRadialGradient(cx, cy, r*0.95, cx, cy, r*1.18);
+  glow.addColorStop(0, 'rgba(79,125,255,.35)'); glow.addColorStop(1, 'rgba(79,125,255,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(cx, cy, r*1.18, 0, 2*Math.PI); ctx.fill();
+  // ocean
+  const ocean = ctx.createRadialGradient(cx - r*0.35, cy - r*0.35, r*0.1, cx, cy, r);
+  ocean.addColorStop(0, OCEAN_IN); ocean.addColorStop(1, OCEAN_OUT);
+  ctx.fillStyle = ocean; ctx.beginPath(); path({type:'Sphere'}); ctx.fill();
+  // graticule
+  ctx.beginPath(); path(graticule); ctx.strokeStyle = 'rgba(120,150,200,.08)'; ctx.lineWidth = 0.6; ctx.stroke();
+  // countries
+  for (const f of features){
+    ctx.beginPath(); path(f);
+    const d = DATA[f.id];
+    ctx.fillStyle = d ? scale(d.score) : NAVY;
+    ctx.fill();
+    ctx.strokeStyle = BORDER; ctx.lineWidth = 0.5; ctx.stroke();
+  }
+  // hover + selection outlines
+  for (const [f, w, c] of [[hovered, 1.6, 'rgba(255,255,255,.75)'], [selected, 2.4, '#FFFFFF']]){
+    if (!f) continue;
+    ctx.beginPath(); path(f); ctx.strokeStyle = c; ctx.lineWidth = w; ctx.stroke();
+  }
+  // rim
+  ctx.beginPath(); path({type:'Sphere'}); ctx.strokeStyle = 'rgba(140,170,230,.35)'; ctx.lineWidth = 1; ctx.stroke();
+}
+
+function featureAt(x, y){
+  const ll = projection.invert([x, y]);
+  if (!ll) return null;
+  // reject points outside the visible disc
+  const [cx, cy] = projection.translate();
+  if (Math.hypot(x - cx, y - cy) > projection.scale()) return null;
+  for (const f of features) if (d3.geoContains(f, ll)) return f;
+  return null;
+}
+
+/* ---------- interaction ---------- */
+let drag = null;
+stage.addEventListener('pointerdown', e => {
+  drag = {x:e.clientX, y:e.clientY, rot:rotation.slice(), moved:false};
+  stage.setPointerCapture(e.pointerId); stage.classList.add('dragging'); noteInteract();
+});
+stage.addEventListener('pointermove', e => {
+  if (drag){
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+    const k = 0.25 / zoom;
+    rotation = [drag.rot[0] + dx * k, Math.max(-75, Math.min(75, drag.rot[1] - dy * k)), 0];
+    hideTip(); draw(); return;
+  }
+  const f = featureAt(e.clientX, e.clientY);
+  if (f !== hovered){ hovered = f; draw(); }
+  if (f) showTip(f, e.clientX, e.clientY); else hideTip();
+});
+stage.addEventListener('pointerup', e => {
+  stage.classList.remove('dragging');
+  if (drag && !drag.moved){
+    const f = featureAt(e.clientX, e.clientY);
+    if (f) select(f, true);
+  }
+  drag = null;
+});
+stage.addEventListener('pointerleave', () => { hovered = null; hideTip(); draw(); });
+stage.addEventListener('wheel', e => { e.preventDefault(); setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1/1.12)); noteInteract(); }, {passive:false});
+document.getElementById('zin').onclick = () => { setZoom(zoom * 1.3); noteInteract(); };
+document.getElementById('zout').onclick = () => { setZoom(zoom / 1.3); noteInteract(); };
+const spinBtn = document.getElementById('spin');
+spinBtn.onclick = () => { spinning = !spinning; spinBtn.setAttribute('aria-pressed', spinning); spinBtn.setAttribute('aria-label', spinning ? 'Pause spinning' : 'Resume spinning'); lastInteract = 0; };
+function setZoom(z){ zoom = Math.max(0.7, Math.min(8, z)); draw(); }
+function noteInteract(){ lastInteract = performance.now(); document.getElementById('hint').style.opacity = 0; }
+
+// pinch zoom
+const pts = new Map(); let pinch0 = null;
+stage.addEventListener('pointerdown', e => pts.set(e.pointerId, e));
+stage.addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, e);
+  if (pts.size === 2){
+    const [a, b] = [...pts.values()]; const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (!pinch0) pinch0 = {d, z:zoom}; else setZoom(pinch0.z * d / pinch0.d);
+    if (drag) drag.moved = true;
+  }
+});
+['pointerup','pointercancel'].forEach(t => stage.addEventListener(t, e => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = null; }));
+
+// auto-spin, paused while the user is interacting or a country is open
+d3.timer(() => {
+  if (spinning && !drag && !selected && performance.now() - lastInteract > 2500){
+    rotation[0] += 0.06; draw();
+  }
+});
+
+/* ---------- tooltip ---------- */
+const tip = document.getElementById('tip');
+function showTip(f, x, y){
+  const d = DATA[f.id];
+  tip.innerHTML = d ? `<b>${d.name}</b>Score ${d.score} <span class="badge">SAMPLE</span> · click for details` : `<b>${esc(f.properties.name)}</b><span style="color:#A3B1C6">NO DATA</span>`;
+  tip.style.display = 'block';
+  const tw = tip.offsetWidth;
+  tip.style.left = Math.min(x + 14, W - tw - 8) + 'px'; tip.style.top = (y + 16) + 'px';
+}
+function hideTip(){ tip.style.display = 'none'; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------- fly to + panel ---------- */
+function flyTo(f){
+  const [lon, lat] = d3.geoCentroid(f);
+  const target = [-lon, Math.max(-60, Math.min(60, -lat)), 0];
+  const from = rotation.slice();
+  // shortest way round
+  let dl = ((target[0] - from[0]) % 360 + 540) % 360 - 180; target[0] = from[0] + dl;
+  const zFrom = zoom, zTo = (DATA[f.id] || f.properties.small) ? Math.max(zoom, f.properties.small ? 2.4 : 1.6) : zoom;
+  if (reduceMotion){ rotation = target; zoom = zTo; draw(); return; }
+  const ir = d3.interpolate(from, target);
+  d3.transition().duration(1100).ease(d3.easeCubicInOut).tween('fly', () => t => { rotation = ir(t); zoom = zFrom + (zTo - zFrom) * t; draw(); });
+}
+function flyToPoint([lon, lat], zTo){
+  const target = [-lon, -lat, 0], from = rotation.slice();
+  target[0] = from[0] + (((target[0] - from[0]) % 360 + 540) % 360 - 180);
+  const zFrom = zoom;
+  if (reduceMotion){ rotation = target; zoom = zTo; draw(); return; }
+  const ir = d3.interpolate(from, target);
+  d3.transition().duration(1200).ease(d3.easeCubicInOut).tween('fly', () => t => { rotation = ir(t); zoom = zFrom + (zTo - zFrom) * t; draw(); });
+}
+const panel = document.getElementById('panel'), pbody = document.getElementById('pbody');
+let mode = 'simple', area = null;
+function select(f, fly){
+  selected = f; area = null; if (fly) flyTo(f); draw(); renderPanel(); panel.classList.add('open');
+  if (location.hash.slice(1) !== slug(f.properties.name)) history.replaceState(null, '', '#' + slug(f.properties.name));
+}
+function closePanel(){ panel.classList.remove('open'); selected = null; draw(); history.replaceState(null, '', location.pathname + location.search); }
+document.getElementById('close').onclick = closePanel;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && panel.classList.contains('open')) closePanel(); });
+
+function renderPanel(){
+  const f = selected; if (!f) return;
+  const d = DATA[f.id];
+  if (!d){
+    pbody.innerHTML = `<h1>${esc(f.properties.name)}</h1>
+      <div style="display:inline-block;font-size:13px;font-weight:700;letter-spacing:.1em;padding:6px 12px;border-radius:8px;background:rgba(30,58,102,.6);border:1px solid #3B5A8C;color:#C9D7F0;margin:2px 0 16px">NO DATA</div>
+      <p class="empty">Pulse doesn’t cover ${esc(f.properties.name)} yet. Every country goes through the same checks before it appears: official sources, data quality and the right to use the data. Germany and Malaysia are the first two.</p>`;
+    return;
+  }
+  if (area !== null){ renderArea(f, d); return; }
+  const ring = scale(d.score);
+  pbody.innerHTML = `
+    <div class="hero" style="background:linear-gradient(135deg, ${CCOL[f.id]}38, rgba(255,255,255,.03) 70%)">
+      <svg class="skyline" viewBox="0 0 240 120" aria-hidden="true" fill="#F2F5FA">${SKY[f.id] || ''}</svg>
+      ${flag(f.id, 64)}
+      <h1>${d.name}</h1>
+      <p class="sub">${d.sub}</p>
+    </div>
+    <div class="scorebox">
+      <svg width="78" height="78" viewBox="0 0 78 78" role="img" aria-label="Sample score ${d.score} out of 100">
+        <circle cx="39" cy="39" r="32" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/>
+        <circle cx="39" cy="39" r="32" fill="none" stroke="${ring}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(2*Math.PI*32*d.score/100).toFixed(1)} 999" transform="rotate(-90 39 39)"/>
+      </svg>
+      <div><div style="display:flex;align-items:center;gap:8px"><span class="num">${d.score}</span><span class="badge">SAMPLE</span></div>
+      <p>Overall economic score out of 100. A sample for now; the real score will come from the six areas below once the method is approved.</p></div>
+    </div>
+    ${scoreBlock(f.id)}
+    <h3>Growth over time · real data</h3>
+    ${growthBlock(f.id)}
+    <div class="toggle" role="group" aria-label="Explanation level" style="margin-top:18px">
+      <button type="button" data-m="simple" aria-pressed="${mode==='simple'}">Simple</button>
+      <button type="button" data-m="advanced" aria-pressed="${mode==='advanced'}">Advanced</button>
+    </div>
+    <h3>Six areas <span class="badge" style="margin-left:6px">SAMPLE</span> <span style="text-transform:none;letter-spacing:0;font-weight:400">· tap one for news</span></h3>
+    <div class="cats">${d.cats.map(([n,s], k) => `<button type="button" class="cat" data-k="${k}"><div><span class="nm">${icon(n, 16)}${n}</span><b>${s}</b></div><div class="track"><div class="fill" style="width:${s}%;background:${scale(s)}"></div></div><span class="more">${(AREAS[f.id][n] && AREAS[f.id][n].news.length) ? AREAS[f.id][n].news.length + ' news · ' : ''}What it means →</span></button>`).join('')}</div>
+    <h3>Key indicators · real data</h3>
+    ${d.inds.map(i => `<div class="ind">
+        <div class="row top"><span class="name">${i.n}</span>${spark(f.id, i.n)}<span class="val">${i.v}</span></div>
+        <div class="row"><span class="chg" style="color:${TONE[i.t]}">${i.c}</span><span class="meta">${i.p}</span></div>
+        ${i.upd ? `<div class="row"><span class="upd">Updated ${fmtDay(i.upd)}</span><span class="tags">${indTags(i)}</span></div>` : ''}
+        <div class="expl">${mode==='simple' ? i.e : '<span style="font-family:IBM Plex Mono,monospace;font-size:12px;color:#A3B1C6">'+i.a+'</span>'}</div>
+        ${newsDrop(f.id, i.n)}
+      </div>`).join('')}
+    ${d.notes.map(n => `<div class="note">${n}</div>`).join('')}
+    <div class="src">Sources: ${d.src} ${LIVE ? 'Key figures update automatically when publishers release new data (last check ' + fmtDay(LIVE.generated_at.slice(0,10)) + ').' : 'Data as of 19 Nov 2026.'} Indicator news checked 18 Nov 2026: summarised in Pulse’s own words with a link to the original. "What it could mean" is Pulse’s interpretation, not fact or advice, and never feeds into the score.</div>`;
+  pbody.querySelectorAll('details.inews').forEach(el => el.addEventListener('toggle', () => { el.open ? newsOpen.add(el.dataset.key) : newsOpen.delete(el.dataset.key); }));
+  pbody.querySelectorAll('.toggle button').forEach(b => b.onclick = () => { const t = panel.scrollTop; mode = b.dataset.m; renderPanel(); panel.scrollTop = t; });
+  pbody.querySelectorAll('.cat').forEach(b => b.onclick = () => { area = +b.dataset.k; renderPanel(); panel.scrollTop = 0; });
+  drawCharts(f.id);
+}
+
+function renderArea(f, d){
+  const [name, score] = d.cats[area];
+  const a = (AREAS[f.id] || {})[name] || {data:[], news:[]};
+  pbody.innerHTML = `
+    <button type="button" class="back" id="back"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>${d.name}</button>
+    <div class="ahead"><span class="aico">${icon(name, 24)}</span><h1 style="font-size:26px">${name}</h1></div>
+    <div style="display:flex;align-items:center;gap:8px;margin:6px 0 16px"><span style="font-family:IBM Plex Mono,monospace;font-size:28px;font-weight:600;color:${scale(score)}">${score}</span><span class="badge">SAMPLE</span></div>
+    <h3>What this area means</h3>
+    <p class="about">${AREA_ABOUT[name]}</p>
+    <h3>What the data says · real data</h3>
+    ${name === 'Economic Growth' ? growthBlock(f.id, true) : name === 'Financial Stability' ? stabilityBlock(f.id) + unempBlock(f.id) : ''}
+    ${a.data.map(([k, v]) => `<div class="dline"><span>${k}</span><b>${v}</b></div>`).join('')}
+    <h3>Recent news</h3>
+    ${a.news.length ? a.news.map(n => `<article class="news">
+        <div class="meta">${n.src} · ${n.date}</div>
+        <h4>${n.h}</h4>
+        <p>${n.sum}</p>
+        <div class="means"><span>WHAT IT COULD MEAN · PULSE’S READING</span>${n.means}</div>
+        <a href="${n.url}" target="_blank" rel="noopener noreferrer">Read the source ↗</a>
+      </article>`).join('') : '<p class="nonews">No major news on this area recently. Pulse will add it here when something happens.</p>'}
+    <div class="src">News is summarised in Pulse’s own words with a link to the original. "What it could mean" is Pulse’s interpretation, not fact or advice, and never feeds into the score. ${LIVE ? 'Key figures update automatically when publishers release new data (last check ' + fmtDay(LIVE.generated_at.slice(0,10)) + ').' : 'Data as of 19 Nov 2026.'}</div>`;
+  document.getElementById('back').onclick = () => { area = null; renderPanel(); panel.scrollTop = 0; };
+  drawCharts(f.id, true);
+}
+
+/* ---------- search ---------- */
+const q = document.getElementById('q'), res = document.getElementById('res');
+let matches = [], active = -1;
+function slug(s){ return s.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+q.addEventListener('input', () => {
+  const s = q.value.trim().toLowerCase();
+  matches = s ? features.filter(f => f.properties.name.toLowerCase().includes(s)).sort((a, b) => (!!DATA[b.id] - !!DATA[a.id]) || a.properties.name.localeCompare(b.properties.name)).slice(0, 8) : [];
+  active = -1; renderResults();
+});
+q.addEventListener('keydown', e => {
+  if (!matches.length) return;
+  if (e.key === 'ArrowDown'){ active = (active + 1) % matches.length; renderResults(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp'){ active = (active - 1 + matches.length) % matches.length; renderResults(); e.preventDefault(); }
+  else if (e.key === 'Enter'){ pick(matches[Math.max(active, 0)]); e.preventDefault(); }
+  else if (e.key === 'Escape'){ matches = []; renderResults(); }
+});
+function renderResults(){
+  res.innerHTML = matches.map((f, i) => `<li><button type="button" role="option" class="${i===active?'active':''}" data-i="${i}">${esc(f.properties.name)}<span class="tag ${DATA[f.id]?'has':''}">${DATA[f.id]?'Data':'No data'}</span></button></li>`).join('');
+  res.classList.toggle('open', matches.length > 0); q.setAttribute('aria-expanded', matches.length > 0);
+  res.querySelectorAll('button').forEach(b => b.onclick = () => pick(matches[+b.dataset.i]));
+}
+function pick(f){ q.value = ''; matches = []; renderResults(); noteInteract(); select(f, true); }
+
+/* ---------- load map ---------- */
+/* ---------- live figures (EDM 0.4): data/pulse.json is written by Pulse's collectors after each release ---------- */
+let LIVE = null;
+function fmtDay(s){ const d = new Date(s + 'T00:00:00Z'); return d.getUTCDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
+function indTags(i){
+  const t = [];
+  if (i.checking) t.push('<span class="tag warn" title="The newest figure did not match the publisher’s headline, so the last verified figure is shown while it is checked">Being checked</span>');
+  if (i.stale) t.push('<span class="tag warn" title="A newer release was expected and has not arrived yet">Newer data due</span>');
+  if (i.label === 'estimate') t.push('<span class="tag info" title="Early estimate: the publisher will revise it">Early estimate</span>');
+  else if (i.label === 'provisional') t.push('<span class="tag info" title="Provisional: the publisher may still revise it">Provisional</span>');
+  return t.join('');
+}
+fetch('data/pulse.json', {cache:'no-store'}).then(r => r.ok ? r.json() : null).then(j => {
+  if (!j) return; LIVE = j;
+  for (const id in j.cards){
+    const d = DATA[id]; if (!d) continue;
+    j.cards[id].forEach(c => {
+      const i = d.inds.find(x => x.n === c.n); if (!i) return;
+      if (i.e && i.v && c.v !== i.v) i.e = i.e.split(i.v.replace(' of GDP', '')).join(c.v.replace(' of GDP', ''));
+      Object.assign(i, {v:c.v, p:c.p, c:c.c, t:c.t, upd:c.updated, label:c.label, stale:c.stale, checking:c.checking});
+    });
+  }
+  for (const id in j.hist) HIST[id] = j.hist[id];
+  if (selected) renderPanel();
+}).catch(() => {});
+
+// world.json: Natural Earth 1:110m country outlines (public domain), via world-atlas, converted to GeoJSON
+fetch('world.json').then(r => r.json()).then(world => {
+  features = world.features;
+  const quick = document.getElementById('quick');
+  Object.keys(DATA).forEach(id => {
+    const f = features.find(x => x.id === id); if (!f) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'chip';
+    b.innerHTML = `<i style="background:${scale(DATA[id].score)}">${DATA[id].score}</i>${flag(id, 22, 'cflag').replace('role="img"', 'aria-hidden="true"')}${DATA[id].name}`;
+    b.setAttribute('aria-label', `${DATA[id].name}, sample score ${DATA[id].score}. Show details`);
+    b.onclick = () => { noteInteract(); select(f, true); };
+    quick.appendChild(b);
+  });
+  const lab = document.createElement('small'); lab.textContent = 'Regions'; lab.style.marginTop = '6px'; quick.appendChild(lab);
+  const pac = document.createElement('button'); pac.type = 'button'; pac.className = 'chip';
+  pac.innerHTML = '<i style="background:#1E3A66;border:1px solid #3B5A8C"></i>Pacific Islands';
+  pac.setAttribute('aria-label', 'Spin to the Pacific Islands');
+  pac.onclick = () => { noteInteract(); if (panel.classList.contains('open')) closePanel(); flyToPoint([172, -12], 2.4); };
+  quick.appendChild(pac);
+  resize();
+  const h = location.hash.slice(1);
+  if (h){ const f = features.find(x => slug(x.properties.name) === h); if (f) select(f, true); }
+});
+window.addEventListener('resize', resize);
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); const f = features.find(x => slug(x.properties.name) === h); if (f && f !== selected) select(f, true); });
+</script>
+</body>
+</html>
