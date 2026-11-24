@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-24T01:10:48+00:00",
+ "generated_at": "2026-11-24T20:32:56+00:00",
  "cards": {
   "276": [
    {
@@ -189,10 +189,10 @@
     "n": "Policy interest rate",
     "v": "2.75%",
     "p": "Nov 2026",
-    "c": "held on 3 Sep 2026",
+    "c": "held on 5 Nov 2026",
     "t": "flat",
     "period": "2026-11-01",
-    "updated": "2026-11-20",
+    "updated": "2026-11-24",
     "label": "final",
     "stale": false,
     "checking": false,
