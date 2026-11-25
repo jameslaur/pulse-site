@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-25T01:16:15+00:00",
+ "generated_at": "2026-11-25T07:24:34+00:00",
  "cards": {
   "276": [
    {
@@ -157,16 +157,16 @@
    {
     "card_id": "MYS.GOODS_BALANCE_M",
     "n": "Goods trade balance",
-    "v": "RM 33.7bn",
-    "p": "Sep 2026",
+    "v": "RM 41.8bn",
+    "p": "Oct 2026",
     "c": "from RM 20.5bn a year ago",
     "t": "good",
-    "period": "2026-09-01",
-    "updated": "2026-10-28",
+    "period": "2026-10-01",
+    "updated": "2026-11-25",
     "label": "final",
     "stale": false,
     "checking": false,
-    "check_detail": "site 33.7 vs headline 33.7",
+    "check_detail": "site 41.8 vs headline 41.8",
     "dataset": "DOSM:trade_headline"
    },
    {
