@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-26T01:16:41+00:00",
+ "generated_at": "2026-11-26T20:35:14+00:00",
  "cards": {
   "276": [
    {
@@ -20,16 +20,16 @@
    {
     "card_id": "DEU.GDP_GROWTH",
     "n": "GDP growth",
-    "v": "1.2%",
+    "v": "1.1%",
     "p": "Q3 2026",
     "c": "from 0.3% a year ago",
     "t": "good",
     "period": "2026-07-01",
-    "updated": "2026-11-17",
+    "updated": "2026-11-25",
     "label": "provisional",
     "stale": false,
     "checking": false,
-    "check_detail": "site 1.2 vs headline 1.2",
+    "check_detail": "site 1.1 vs headline 1.1",
     "dataset": "ESTAT:namq_10_gdp"
    },
    {
@@ -40,7 +40,7 @@
     "c": "from €15.5bn a year ago",
     "t": "flat",
     "period": "2026-09-01",
-    "updated": "2026-11-12",
+    "updated": "2026-11-26",
     "label": "provisional",
     "stale": false,
     "checking": false,
@@ -2131,7 +2131,7 @@
     ],
     [
      "2026-07",
-     1.2
+     1.1
     ]
    ],
    "cpi": [
