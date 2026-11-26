@@ -1053,6 +1053,13 @@ fetch('data/pulse.json', {cache:'no-store'}).then(r => r.ok ? r.json() : null).t
     });
   }
   for (const id in j.hist) HIST[id] = j.hist[id];
+  // area pages: swap in each listed figure (matched by its label without the period)
+  for (const id in (j.areas || {})){
+    const A = AREAS[id]; if (!A) continue;
+    const m = Object.fromEntries(j.areas[id].map(([k, l, v]) => [k, [l, v]]));
+    for (const name in A) if (A[name].data)
+      A[name].data = A[name].data.map(([l, v]) => m[l.replace(/, (Q[1-4] \d{4}|[A-Z][a-z]{2} \d{4}|\d{4})$/, '')] || [l, v]);
+  }
   if (selected) renderPanel();
 }).catch(() => {});
 

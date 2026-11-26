@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-26T20:35:14+00:00",
+ "generated_at": "2026-11-26T21:26:05+00:00",
  "cards": {
   "276": [
    {
@@ -3701,5 +3701,176 @@
     ]
    ]
   }
+ },
+ "areas": {
+  "458": [
+   [
+    "GDP growth",
+    "GDP growth, Q3 2026",
+    "5.5%"
+   ],
+   [
+    "GDP growth, a year earlier",
+    "GDP growth, a year earlier",
+    "5.3%"
+   ],
+   [
+    "Industrial production vs a year ago",
+    "Industrial production vs a year ago, Sep 2026",
+    "+6.3%"
+   ],
+   [
+    "Inflation",
+    "Inflation, Oct 2026",
+    "1.9%"
+   ],
+   [
+    "Unemployment",
+    "Unemployment, Sep 2026",
+    "2.9%"
+   ],
+   [
+    "Policy rate (OPR)",
+    "Policy rate (OPR)",
+    "2.75%"
+   ],
+   [
+    "Ringgit per US dollar",
+    "Ringgit per US dollar, Oct 2026",
+    "RM 4.08"
+   ],
+   [
+    "Goods exports",
+    "Goods exports, Oct 2026",
+    "RM 239.2bn"
+   ],
+   [
+    "Goods trade balance",
+    "Goods trade balance, Oct 2026",
+    "RM 41.8bn"
+   ],
+   [
+    "Trade ÷ GDP",
+    "Trade ÷ GDP, Q3 2026",
+    "164%"
+   ],
+   [
+    "Investment share of GDP",
+    "Investment share of GDP, Q3 2026",
+    "20.3%"
+   ],
+   [
+    "Net foreign direct investment",
+    "Net foreign direct investment, Q2 2026",
+    "RM 7.4bn"
+   ],
+   [
+    "Budget balance",
+    "Budget balance, 2025",
+    "−3.7% of GDP"
+   ],
+   [
+    "Interest ÷ revenue",
+    "Interest ÷ revenue, 2025",
+    "16.0%"
+   ],
+   [
+    "Output per hour",
+    "Output per hour, Q3 2026",
+    "RM 48.20"
+   ],
+   [
+    "Industry output per hour",
+    "Industry output per hour, Q3 2026",
+    "RM 64.20"
+   ]
+  ],
+  "276": [
+   [
+    "GDP growth",
+    "GDP growth, Q3 2026",
+    "1.1%"
+   ],
+   [
+    "GDP growth, a year earlier",
+    "GDP growth, a year earlier",
+    "0.3%"
+   ],
+   [
+    "Industrial production vs a year ago",
+    "Industrial production vs a year ago, Sep 2026",
+    "+0.9%"
+   ],
+   [
+    "Inflation",
+    "Inflation, Oct 2026",
+    "2.9%"
+   ],
+   [
+    "Unemployment (EU measure)",
+    "Unemployment (EU measure), Sep 2026",
+    "4.1%"
+   ],
+   [
+    "ECB deposit rate",
+    "ECB deposit rate",
+    "2.50%"
+   ],
+   [
+    "US dollars per euro",
+    "US dollars per euro, Oct 2026",
+    "$1.12"
+   ],
+   [
+    "Goods exports",
+    "Goods exports, Sep 2026",
+    "€141.1bn"
+   ],
+   [
+    "Goods trade balance",
+    "Goods trade balance, Sep 2026",
+    "€15.6bn"
+   ],
+   [
+    "Trade ÷ GDP",
+    "Trade ÷ GDP, Q3 2026",
+    "80%"
+   ],
+   [
+    "Investment share of GDP",
+    "Investment share of GDP, Q3 2026",
+    "19.8%"
+   ],
+   [
+    "Credit growth",
+    "Credit growth, Oct 2026",
+    "3.5%"
+   ],
+   [
+    "Budget balance",
+    "Budget balance, 2025",
+    "−2.9% of GDP"
+   ],
+   [
+    "Public debt",
+    "Public debt, 2025",
+    "62.8% of GDP"
+   ],
+   [
+    "Interest ÷ revenue",
+    "Interest ÷ revenue, 2025",
+    "2.3%"
+   ],
+   [
+    "Manufacturing output per hour",
+    "Manufacturing output per hour, Q3 2026",
+    "€68.40"
+   ],
+   [
+    "Unit labour cost (2020=100)",
+    "Unit labour cost (2020=100), 2025",
+    "122.6"
+   ]
+  ]
  }
 }
